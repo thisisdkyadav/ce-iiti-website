@@ -7,9 +7,6 @@ import {
   getCachedPublicContentByKey,
   resolveMediaUrl,
 } from '../lib/contentApi';
-import LoadingScreen from '../components/LoadingScreen';
-
-let hasAttemptedInitialHomeLoad = false;
 
 // --- Custom Animated Counter Component ---
 // Replaces react-countup to avoid dependency issues
@@ -236,17 +233,11 @@ const Home = () => {
   };
 
   const initialMappedHomeData = mapHomeData(getCachedPublicContentByKey('home'));
-  const hasInitialCachedHomeData = initialMappedHomeData.hasData;
-  const shouldShowInitialLoader =
-    !hasAttemptedInitialHomeLoad && !hasInitialCachedHomeData;
 
   const [slides, setSlides] = useState(initialMappedHomeData.slides);
   const [stats, setStats] = useState(initialMappedHomeData.stats);
   const [news, setNews] = useState(initialMappedHomeData.news);
   const [homeContent, setHomeContent] = useState(initialMappedHomeData.homeContent);
-  const [homeLoadState, setHomeLoadState] = useState(
-    shouldShowInitialLoader ? 'loading' : 'ready'
-  );
 
   useEffect(() => {
     let isMounted = true;
@@ -259,10 +250,6 @@ const Home = () => {
     };
 
     const loadHomeContent = async () => {
-      if (!hasAttemptedInitialHomeLoad) {
-        hasAttemptedInitialHomeLoad = true;
-      }
-
       try {
         const data = await fetchHomeContent();
 
@@ -276,19 +263,12 @@ const Home = () => {
         setStats(mappedData.stats);
         setNews(mappedData.news);
         setHomeContent(mappedData.homeContent);
-        setHomeLoadState('ready');
       } catch (_error) {
         if (!isMounted) {
           return;
         }
 
-        if (hasInitialCachedHomeData) {
-          setHomeLoadState('ready');
-          return;
-        }
-
         applyFallbackContent();
-        setHomeLoadState('fallback');
       }
     };
 
@@ -367,21 +347,11 @@ const Home = () => {
   const newsHeaderInView = useInView(newsHeaderRef, { once: true, amount: 0.3 });
   const ctaInView = useInView(ctaRef, { once: true, amount: 0.3 });
 
-  if (homeLoadState === 'loading' || !homeContent) {
-    return (
-      <LoadingScreen
-        message="Loading homepage..."
-        fullScreen
-        coverPage
-      />
-    );
-  }
-
 
   return (
     <div className="bg-white">
       {/* Hero Section with Carousel */}
-      <section className="relative h-screen overflow-hidden">
+      <section className="relative h-[65vh] min-h-[420px] md:h-[75vh] lg:h-screen overflow-hidden">
         {slides.map((slide, index) => (
           <div
             key={index}
