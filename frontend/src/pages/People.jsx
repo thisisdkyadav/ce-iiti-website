@@ -1,14 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import { Mail, Phone, Award, BookOpen, Users, Search, GraduationCap, Building, User, Link as LinkIcon, Download, MapPin, ExternalLink } from 'lucide-react';
 import LoadingScreen from '../components/LoadingScreen';
-import { fetchPublicContentByKey, resolveMediaUrl } from '../lib/contentApi';
+import {
+  fetchPublicContentByKey,
+  getCachedPublicContentByKey,
+  resolveMediaUrl,
+} from '../lib/contentApi';
 
 const People = () => {
+  const normalizePeopleContent = (data) => {
+    if (!data || typeof data !== 'object') {
+      return null;
+    }
+
+    return {
+      regularFaculty: Array.isArray(data.regularFaculty) ? data.regularFaculty : [],
+      staff: Array.isArray(data.staff) ? data.staff : [],
+      phdStudents: Array.isArray(data.phdStudents) ? data.phdStudents : [],
+      mtechStudents: Array.isArray(data.mtechStudents) ? data.mtechStudents : [],
+      btechStudents: Array.isArray(data.btechStudents) ? data.btechStudents : [],
+    };
+  };
+
+  const initialPeopleContent = normalizePeopleContent(
+    getCachedPublicContentByKey('people')
+  );
+  const hasInitialCachedPeopleContent = Boolean(initialPeopleContent);
+
   const [activeTab, setActiveTab] = useState('regularFaculty');
   const [searchTerm, setSearchTerm] = useState('');
   const [specializationFilter, setSpecializationFilter] = useState('All');
-  const [peopleContent, setPeopleContent] = useState(null);
-  const [peopleLoadState, setPeopleLoadState] = useState('loading');
+  const [peopleContent, setPeopleContent] = useState(initialPeopleContent);
+  const [peopleLoadState, setPeopleLoadState] = useState(
+    hasInitialCachedPeopleContent ? 'ready' : 'loading'
+  );
 
   // --- Faculty Data ---
   const regularFaculty = [
@@ -385,18 +410,33 @@ const People = () => {
     let isMounted = true;
 
     const loadPeopleContent = async () => {
-      setPeopleLoadState('loading');
+      if (!hasInitialCachedPeopleContent) {
+        setPeopleLoadState('loading');
+      }
 
       try {
-        const data = await fetchPublicContentByKey('people');
+        const data = await fetchPublicContentByKey('people', {
+          force: hasInitialCachedPeopleContent,
+        });
         if (!isMounted) {
           return;
         }
 
-        setPeopleContent(data || null);
-        setPeopleLoadState('ready');
+        const normalizedData = normalizePeopleContent(data);
+        if (normalizedData) {
+          setPeopleContent(normalizedData);
+          setPeopleLoadState('ready');
+        } else {
+          setPeopleContent(null);
+          setPeopleLoadState('fallback');
+        }
       } catch (_error) {
         if (!isMounted) {
+          return;
+        }
+
+        if (hasInitialCachedPeopleContent) {
+          setPeopleLoadState('ready');
           return;
         }
 
@@ -895,16 +935,6 @@ const People = () => {
     }
   };
 
-  if (peopleLoadState === 'loading') {
-    return (
-      <LoadingScreen
-        message="Loading people directory..."
-        fullScreen={false}
-        coverPage
-      />
-    );
-  }
-
 
   return (
     <div className="bg-white">
@@ -971,26 +1001,34 @@ const People = () => {
       {/* Content */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {peopleLoadState === 'loading' ? (
+            <LoadingScreen
+              message="Loading people directory..."
+              fullScreen={false}
+            />
+          ) : (
+            <>
+              {activeTab === 'regularFaculty' && (
+                <div className="flex flex-wrap justify-center gap-2 mb-12">
+                  {specializations.map((spec) => (
+                    <button
+                      key={spec}
+                      onClick={() => setSpecializationFilter(spec)}
+                      className={`px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${specializationFilter === spec
+                          ? 'bg-blue-800 text-white shadow-md'
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        }`}
+                    >
+                      {spec}
+                    </button>
+                  ))}
 
-          {activeTab === 'regularFaculty' && (
-            <div className="flex flex-wrap justify-center gap-2 mb-12">
-              {specializations.map((spec) => (
-                <button
-                  key={spec}
-                  onClick={() => setSpecializationFilter(spec)}
-                  className={`px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${specializationFilter === spec
-                      ? 'bg-blue-800 text-white shadow-md'
-                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                    }`}
-                >
-                  {spec}
-                </button>
-              ))}
+                </div>
+              )}
 
-            </div>
+              {renderGrid()}
+            </>
           )}
-
-          {renderGrid()}
         </div>
       </section>
 

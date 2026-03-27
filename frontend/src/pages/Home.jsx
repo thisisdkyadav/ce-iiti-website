@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Calendar, Users, BookOpen, Award, ArrowRight } from 'lucide-react';
 import { motion, useInView, useSpring, useMotionValue, useTransform } from 'framer-motion';
-import { fetchHomeContent, resolveMediaUrl } from '../lib/contentApi';
+import {
+  fetchHomeContent,
+  getCachedPublicContentByKey,
+  resolveMediaUrl,
+} from '../lib/contentApi';
 import LoadingScreen from '../components/LoadingScreen';
 
 // --- Custom Animated Counter Component ---
@@ -149,11 +153,96 @@ const Home = () => {
     ctaTertiaryLink: '/contact',
   };
 
-  const [slides, setSlides] = useState([]);
-  const [stats, setStats] = useState([]);
-  const [news, setNews] = useState([]);
-  const [homeContent, setHomeContent] = useState(null);
-  const [homeLoadState, setHomeLoadState] = useState('loading');
+  const iconMap = {
+    Users,
+    BookOpen,
+    Award,
+    Calendar,
+  };
+
+  const mapHomeData = (data) => {
+    const mappedSlides =
+      Array.isArray(data?.slides) && data.slides.length > 0
+        ? data.slides.map((slide) => ({
+            image: resolveMediaUrl(slide.image_url),
+            title: slide.title,
+            subtitle: slide.subtitle,
+            cta: slide.cta_text,
+            link: slide.cta_link,
+          }))
+        : fallbackSlides;
+
+    const mappedStats =
+      Array.isArray(data?.stats) && data.stats.length > 0
+        ? data.stats.map((stat) => ({
+            icon: iconMap[stat.icon_name] || Users,
+            label: stat.label,
+            value: Number(stat.value),
+            suffix: stat.suffix || '',
+          }))
+        : fallbackStats;
+
+    const mappedNews =
+      Array.isArray(data?.news) && data.news.length > 0
+        ? data.news.map((item) => ({
+            date: item.publish_date,
+            title: item.title,
+            excerpt: item.excerpt,
+            link: item.external_link,
+          }))
+        : fallbackNews;
+
+    const backendHomeContent = data?.homeContent || {};
+    const mappedHomeContent = {
+      ...defaultHomeContent,
+      welcomeTitle:
+        backendHomeContent.welcome_title || defaultHomeContent.welcomeTitle,
+      welcomeParagraph1:
+        backendHomeContent.welcome_paragraph_1 ||
+        defaultHomeContent.welcomeParagraph1,
+      welcomeParagraph2:
+        backendHomeContent.welcome_paragraph_2 ||
+        defaultHomeContent.welcomeParagraph2,
+      welcomeImage:
+        resolveMediaUrl(backendHomeContent.welcome_image_url) ||
+        defaultHomeContent.welcomeImage,
+      ctaTitle: backendHomeContent.cta_title || defaultHomeContent.ctaTitle,
+      ctaDescription:
+        backendHomeContent.cta_description || defaultHomeContent.ctaDescription,
+      ctaPrimaryText:
+        backendHomeContent.cta_primary_text || defaultHomeContent.ctaPrimaryText,
+      ctaPrimaryLink:
+        backendHomeContent.cta_primary_link || defaultHomeContent.ctaPrimaryLink,
+      ctaSecondaryText:
+        backendHomeContent.cta_secondary_text ||
+        defaultHomeContent.ctaSecondaryText,
+      ctaSecondaryLink:
+        backendHomeContent.cta_secondary_link || defaultHomeContent.ctaSecondaryLink,
+      ctaTertiaryText:
+        backendHomeContent.cta_tertiary_text || defaultHomeContent.ctaTertiaryText,
+      ctaTertiaryLink:
+        backendHomeContent.cta_tertiary_link || defaultHomeContent.ctaTertiaryLink,
+    };
+
+    return {
+      slides: mappedSlides,
+      stats: mappedStats,
+      news: mappedNews,
+      homeContent: mappedHomeContent,
+      hasData: Boolean(data),
+    };
+  };
+
+  const initialMappedHomeData = mapHomeData(getCachedPublicContentByKey('home'));
+  const hasInitialCachedHomeData = initialMappedHomeData.hasData;
+
+  const [slides, setSlides] = useState(initialMappedHomeData.slides);
+  const [stats, setStats] = useState(initialMappedHomeData.stats);
+  const [news, setNews] = useState(initialMappedHomeData.news);
+  const [homeContent, setHomeContent] = useState(initialMappedHomeData.homeContent);
+  const [homeLoadState, setHomeLoadState] = useState(
+    hasInitialCachedHomeData ? 'ready' : 'loading'
+  );
 
   const preloadImages = async (urls) => {
     const imageUrls = Array.from(new Set((urls || []).filter(Boolean)));
@@ -174,13 +263,6 @@ const Home = () => {
   useEffect(() => {
     let isMounted = true;
 
-    const iconMap = {
-      Users,
-      BookOpen,
-      Award,
-      Calendar,
-    };
-
     const applyFallbackContent = () => {
       setSlides(fallbackSlides);
       setStats(fallbackStats);
@@ -190,92 +272,35 @@ const Home = () => {
 
     const loadHomeContent = async () => {
       try {
-        const data = await fetchHomeContent();
+        const data = await fetchHomeContent({ force: hasInitialCachedHomeData });
 
         if (!isMounted) {
           return;
         }
 
-        const mappedSlides =
-          Array.isArray(data?.slides) && data.slides.length > 0
-            ? data.slides.map((slide) => ({
-                image: resolveMediaUrl(slide.image_url),
-                title: slide.title,
-                subtitle: slide.subtitle,
-                cta: slide.cta_text,
-                link: slide.cta_link,
-              }))
-            : fallbackSlides;
-
-        const mappedStats =
-          Array.isArray(data?.stats) && data.stats.length > 0
-            ? data.stats.map((stat) => ({
-                icon: iconMap[stat.icon_name] || Users,
-                label: stat.label,
-                value: Number(stat.value),
-                suffix: stat.suffix || '',
-              }))
-            : fallbackStats;
-
-        const mappedNews =
-          Array.isArray(data?.news) && data.news.length > 0
-            ? data.news.map((item) => ({
-                date: item.publish_date,
-                title: item.title,
-                excerpt: item.excerpt,
-                link: item.external_link,
-              }))
-            : fallbackNews;
-
-        const backendHomeContent = data?.homeContent || {};
-        const mappedHomeContent = {
-          ...defaultHomeContent,
-          welcomeTitle:
-            backendHomeContent.welcome_title || defaultHomeContent.welcomeTitle,
-          welcomeParagraph1:
-            backendHomeContent.welcome_paragraph_1 ||
-            defaultHomeContent.welcomeParagraph1,
-          welcomeParagraph2:
-            backendHomeContent.welcome_paragraph_2 ||
-            defaultHomeContent.welcomeParagraph2,
-          welcomeImage:
-            resolveMediaUrl(backendHomeContent.welcome_image_url) ||
-            defaultHomeContent.welcomeImage,
-          ctaTitle: backendHomeContent.cta_title || defaultHomeContent.ctaTitle,
-          ctaDescription:
-            backendHomeContent.cta_description || defaultHomeContent.ctaDescription,
-          ctaPrimaryText:
-            backendHomeContent.cta_primary_text || defaultHomeContent.ctaPrimaryText,
-          ctaPrimaryLink:
-            backendHomeContent.cta_primary_link || defaultHomeContent.ctaPrimaryLink,
-          ctaSecondaryText:
-            backendHomeContent.cta_secondary_text ||
-            defaultHomeContent.ctaSecondaryText,
-          ctaSecondaryLink:
-            backendHomeContent.cta_secondary_link ||
-            defaultHomeContent.ctaSecondaryLink,
-          ctaTertiaryText:
-            backendHomeContent.cta_tertiary_text || defaultHomeContent.ctaTertiaryText,
-          ctaTertiaryLink:
-            backendHomeContent.cta_tertiary_link || defaultHomeContent.ctaTertiaryLink,
-        };
+        const mappedData = mapHomeData(data);
 
         await preloadImages([
-          mappedSlides[0]?.image,
-          mappedHomeContent.welcomeImage,
+          mappedData.slides[0]?.image,
+          mappedData.homeContent.welcomeImage,
         ]);
 
         if (!isMounted) {
           return;
         }
 
-        setSlides(mappedSlides);
-        setStats(mappedStats);
-        setNews(mappedNews);
-        setHomeContent(mappedHomeContent);
+        setSlides(mappedData.slides);
+        setStats(mappedData.stats);
+        setNews(mappedData.news);
+        setHomeContent(mappedData.homeContent);
         setHomeLoadState('ready');
       } catch (_error) {
         if (!isMounted) {
+          return;
+        }
+
+        if (hasInitialCachedHomeData) {
+          setHomeLoadState('ready');
           return;
         }
 
@@ -469,7 +494,7 @@ const Home = () => {
                 key={index} 
                 className="text-center group"
                 initial={{ opacity: 0, y: 20 }}
-                animate={statsInView ? { opacity: 1, y: 0 } : {}}
+                animate={statsInView ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
                 <div className="bg-blue-800 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-amber-500 group-hover:scale-110 transition-all duration-300 transform">
@@ -493,7 +518,7 @@ const Home = () => {
             className="text-center mb-12"
             ref={newsHeaderRef}
             initial={{ opacity: 0, y: 20 }}
-            animate={newsHeaderInView ? { opacity: 1, y: 0 } : {}}
+            animate={newsHeaderInView ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
             <h2 className="text-4xl font-bold text-gray-900 mb-4">Latest News & Updates</h2>
@@ -602,7 +627,7 @@ const Home = () => {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
               initial={{ opacity: 0, x: -50 }}
-              animate={welcomeInView ? { opacity: 1, x: 0 } : {}}
+              animate={welcomeInView ? { opacity: 1, x: 0 } : { opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
             >
               <h2 className="text-4xl font-bold text-gray-900 mb-6">
@@ -637,7 +662,7 @@ const Home = () => {
             <motion.div 
               className="relative"
               initial={{ opacity: 0, x: 50 }}
-              animate={welcomeInView ? { opacity: 1, x: 0 } : {}}
+              animate={welcomeInView ? { opacity: 1, x: 0 } : { opacity: 1, x: 0 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
             >
               {/* Ensure this image path is also correct or use a local placeholder if needed */}
@@ -657,7 +682,7 @@ const Home = () => {
         <motion.div 
           className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center"
           initial={{ opacity: 0, y: 50 }}
-          animate={ctaInView ? { opacity: 1, y: 0 } : {}}
+          animate={ctaInView ? { opacity: 1, y: 0 } : { opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
         >
           <h2 className="text-4xl font-bold text-white mb-6">

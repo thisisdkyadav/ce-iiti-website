@@ -138,6 +138,14 @@ export async function fetchPublicContentByKey(key, options = {}) {
   return requestPromise;
 }
 
+export function getCachedPublicContentByKey(key) {
+  if (!publicContentCache.has(key)) {
+    return null;
+  }
+
+  return publicContentCache.get(key).data;
+}
+
 export function getPublicContentKeyFromPath(pathname) {
   return publicRouteKeyMap[pathname] || null;
 }
