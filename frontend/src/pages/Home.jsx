@@ -9,6 +9,8 @@ import {
 } from '../lib/contentApi';
 import LoadingScreen from '../components/LoadingScreen';
 
+let hasAttemptedInitialHomeLoad = false;
+
 // --- Custom Animated Counter Component ---
 // Replaces react-countup to avoid dependency issues
 const AnimatedCounter = ({ value, suffix = '', duration = 2.5 }) => {
@@ -235,30 +237,16 @@ const Home = () => {
 
   const initialMappedHomeData = mapHomeData(getCachedPublicContentByKey('home'));
   const hasInitialCachedHomeData = initialMappedHomeData.hasData;
+  const shouldShowInitialLoader =
+    !hasAttemptedInitialHomeLoad && !hasInitialCachedHomeData;
 
   const [slides, setSlides] = useState(initialMappedHomeData.slides);
   const [stats, setStats] = useState(initialMappedHomeData.stats);
   const [news, setNews] = useState(initialMappedHomeData.news);
   const [homeContent, setHomeContent] = useState(initialMappedHomeData.homeContent);
   const [homeLoadState, setHomeLoadState] = useState(
-    hasInitialCachedHomeData ? 'ready' : 'loading'
+    shouldShowInitialLoader ? 'loading' : 'ready'
   );
-
-  const preloadImages = async (urls) => {
-    const imageUrls = Array.from(new Set((urls || []).filter(Boolean)));
-
-    await Promise.all(
-      imageUrls.map(
-        (url) =>
-          new Promise((resolve) => {
-            const image = new Image();
-            image.onload = () => resolve(true);
-            image.onerror = () => resolve(false);
-            image.src = url;
-          })
-      )
-    );
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -271,23 +259,18 @@ const Home = () => {
     };
 
     const loadHomeContent = async () => {
+      if (!hasAttemptedInitialHomeLoad) {
+        hasAttemptedInitialHomeLoad = true;
+      }
+
       try {
-        const data = await fetchHomeContent({ force: hasInitialCachedHomeData });
+        const data = await fetchHomeContent();
 
         if (!isMounted) {
           return;
         }
 
         const mappedData = mapHomeData(data);
-
-        await preloadImages([
-          mappedData.slides[0]?.image,
-          mappedData.homeContent.welcomeImage,
-        ]);
-
-        if (!isMounted) {
-          return;
-        }
 
         setSlides(mappedData.slides);
         setStats(mappedData.stats);
@@ -301,15 +284,6 @@ const Home = () => {
 
         if (hasInitialCachedHomeData) {
           setHomeLoadState('ready');
-          return;
-        }
-
-        await preloadImages([
-          fallbackSlides[0]?.image,
-          defaultHomeContent.welcomeImage,
-        ]);
-
-        if (!isMounted) {
           return;
         }
 
@@ -669,7 +643,9 @@ const Home = () => {
               <img
                 src={homeContent.welcomeImage}
                 alt="Civil Engineering"
-                className="rounded-lg shadow-2xl"
+                className="w-full h-[420px] object-cover rounded-lg shadow-2xl bg-gray-200"
+                loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-blue-900/20 to-transparent rounded-lg"></div>
             </motion.div>

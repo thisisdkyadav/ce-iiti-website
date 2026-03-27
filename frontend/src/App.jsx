@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -19,13 +19,11 @@ import {
   getBackgroundPublicContentKeys,
   getPublicContentKeyFromPath,
   prefetchPublicContent,
-  startPublicContentAutoRefresh,
 } from './lib/contentApi';
 
 function AppLayout() {
   const [bootstrapContent, setBootstrapContent] = useState(null);
   const [bootstrapState, setBootstrapState] = useState('loading');
-  const refreshStopRef = useRef(null);
   const location = useLocation();
 
   const isAdminRoute = location.pathname === '/admin' || location.pathname === '/admin/login';
@@ -41,7 +39,7 @@ function AppLayout() {
       setBootstrapState('loading');
 
       try {
-        const data = await fetchBootstrapContent({ force: true });
+        const data = await fetchBootstrapContent();
         if (isMounted) {
           setBootstrapContent(data);
           setBootstrapState('ready');
@@ -60,23 +58,12 @@ function AppLayout() {
 
       const keys = getBackgroundPublicContentKeys('home');
       prefetchPublicContent(keys);
-
-      if (refreshStopRef.current) {
-        refreshStopRef.current();
-      }
-
-      refreshStopRef.current = startPublicContentAutoRefresh(keys, 60_000);
     };
 
     loadBootstrapContent();
 
     return () => {
       isMounted = false;
-
-      if (refreshStopRef.current) {
-        refreshStopRef.current();
-        refreshStopRef.current = null;
-      }
     };
   }, [isAdminRoute]);
 

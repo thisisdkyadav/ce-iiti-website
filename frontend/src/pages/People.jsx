@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Mail, Phone, Award, BookOpen, Users, Search, GraduationCap, Building, User, Link as LinkIcon, Download, MapPin, ExternalLink } from 'lucide-react';
-import LoadingScreen from '../components/LoadingScreen';
 import {
   fetchPublicContentByKey,
   getCachedPublicContentByKey,
@@ -32,7 +31,7 @@ const People = () => {
   const [specializationFilter, setSpecializationFilter] = useState('All');
   const [peopleContent, setPeopleContent] = useState(initialPeopleContent);
   const [peopleLoadState, setPeopleLoadState] = useState(
-    hasInitialCachedPeopleContent ? 'ready' : 'loading'
+    hasInitialCachedPeopleContent ? 'ready' : 'fallback'
   );
 
   // --- Faculty Data ---
@@ -410,14 +409,8 @@ const People = () => {
     let isMounted = true;
 
     const loadPeopleContent = async () => {
-      if (!hasInitialCachedPeopleContent) {
-        setPeopleLoadState('loading');
-      }
-
       try {
-        const data = await fetchPublicContentByKey('people', {
-          force: hasInitialCachedPeopleContent,
-        });
+        const data = await fetchPublicContentByKey('people');
         if (!isMounted) {
           return;
         }
@@ -721,7 +714,9 @@ const People = () => {
           <img
             src={resolveMediaUrl(member.image)}
             alt={member.name}
-            className="w-24 h-24 rounded-full object-cover border-4 border-blue-100 group-hover:border-amber-200 transition-colors duration-300"
+            className="w-24 h-24 rounded-full object-cover border-4 border-blue-100 group-hover:border-amber-200 transition-colors duration-300 bg-gray-200"
+            loading="lazy"
+            decoding="async"
             onError={(event) => {
               event.currentTarget.onerror = null;
               event.currentTarget.src = resolveMediaUrl(fallbackFacultyImage);
@@ -775,7 +770,9 @@ const People = () => {
           <img
             src={resolveMediaUrl(member.image)}
             alt={member.name}
-            className="w-32 h-32 rounded-full mx-auto mb-4 object-cover border-4 border-green-100"
+            className="w-32 h-32 rounded-full mx-auto mb-4 object-cover border-4 border-green-100 bg-gray-200"
+            loading="lazy"
+            decoding="async"
             onError={(event) => {
               event.currentTarget.onerror = null;
               event.currentTarget.src = resolveMediaUrl(fallbackStaffImage);
@@ -812,7 +809,9 @@ const People = () => {
         <img
           src={resolveMediaUrl(student.image)}
           alt={student.name}
-          className="w-full h-48 object-cover rounded-md mb-3"
+          className="w-full h-48 object-cover rounded-md mb-3 bg-gray-200"
+          loading="lazy"
+          decoding="async"
           onError={(event) => {
             event.currentTarget.onerror = null;
             event.currentTarget.src = resolveMediaUrl(fallbackStudentImage);
@@ -1001,34 +1000,25 @@ const People = () => {
       {/* Content */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {peopleLoadState === 'loading' ? (
-            <LoadingScreen
-              message="Loading people directory..."
-              fullScreen={false}
-            />
-          ) : (
-            <>
-              {activeTab === 'regularFaculty' && (
-                <div className="flex flex-wrap justify-center gap-2 mb-12">
-                  {specializations.map((spec) => (
-                    <button
-                      key={spec}
-                      onClick={() => setSpecializationFilter(spec)}
-                      className={`px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${specializationFilter === spec
-                          ? 'bg-blue-800 text-white shadow-md'
-                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                        }`}
-                    >
-                      {spec}
-                    </button>
-                  ))}
+          {activeTab === 'regularFaculty' && (
+            <div className="flex flex-wrap justify-center gap-2 mb-12">
+              {specializations.map((spec) => (
+                <button
+                  key={spec}
+                  onClick={() => setSpecializationFilter(spec)}
+                  className={`px-4 py-2 rounded-full font-medium text-sm transition-all duration-300 ${specializationFilter === spec
+                      ? 'bg-blue-800 text-white shadow-md'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                >
+                  {spec}
+                </button>
+              ))}
 
-                </div>
-              )}
-
-              {renderGrid()}
-            </>
+            </div>
           )}
+
+          {renderGrid()}
         </div>
       </section>
 
