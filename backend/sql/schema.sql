@@ -106,6 +106,30 @@ CREATE TABLE IF NOT EXISTS news_items (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS people_entries (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  category ENUM('faculty', 'staff', 'phd', 'mtech', 'btech') NOT NULL,
+  name VARCHAR(190) NULL,
+  designation VARCHAR(190) NULL,
+  specialization VARCHAR(190) NULL,
+  department VARCHAR(190) NULL,
+  year_label VARCHAR(120) NULL,
+  email VARCHAR(255) NULL,
+  phone VARCHAR(120) NULL,
+  room VARCHAR(120) NULL,
+  profile_url VARCHAR(1024) NULL,
+  image_url VARCHAR(512) NULL,
+  resource_link VARCHAR(1024) NULL,
+  research_interests JSON NULL,
+  responsibilities JSON NULL,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_people_entries_category_sort (category, sort_order, id),
+  INDEX idx_people_entries_active (is_active)
+);
+
 CREATE TABLE IF NOT EXISTS admin_users (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(80) NOT NULL UNIQUE,

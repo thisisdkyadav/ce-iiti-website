@@ -30,7 +30,7 @@ const publicContentFetchers = {
   },
   people: {
     fetcher: optionalPublicEndpointFetcher("/api/public/people"),
-    optional: true,
+    optional: false,
   },
   specializations: {
     fetcher: optionalPublicEndpointFetcher("/api/public/specializations"),
@@ -374,6 +374,26 @@ export function updateNewsItem(id, payload) {
 
 export function deleteNewsItem(id) {
   return adminRequest(`/api/admin/news/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export function createPeopleEntry(payload) {
+  return adminRequest("/api/admin/people", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updatePeopleEntry(id, payload) {
+  return adminRequest(`/api/admin/people/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export function deletePeopleEntry(id) {
+  return adminRequest(`/api/admin/people/${id}`, {
     method: "DELETE",
   });
 }

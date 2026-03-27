@@ -44,6 +44,7 @@ API will run at `http://localhost:4000` by default.
 - `GET /api/health`
 - `GET /api/public/bootstrap`
 - `GET /api/public/home`
+- `GET /api/public/people`
 
 ## 3) Admin Authentication
 
@@ -70,12 +71,13 @@ All endpoints below require an authenticated admin session:
 - `POST/PATCH/DELETE /api/admin/home/hero-slides`
 - `POST/PATCH/DELETE /api/admin/home/stats`
 - `POST/PATCH/DELETE /api/admin/news`
+- `GET /api/admin/people`
+- `POST/PATCH/DELETE /api/admin/people`
 
 ## 5) Next Migration Targets
 
-After this first slice, move these domains to API similarly:
+After this slice, move these domains to API similarly:
 - About page sections
 - Academics programs and curriculum
-- People (faculty/staff/students)
 - Specializations, labs, and equipment
 - Events and contact submissions

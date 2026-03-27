@@ -165,6 +165,67 @@ const newsPatchSchema = nonEmptyPatch({
   is_active: z.number().int().min(0).max(1),
 });
 
+const nullableStringField = z.union([z.string().min(1), z.null()]);
+const nullableStringListField = z.union([z.array(z.string()), z.null()]);
+const peopleCategorySchema = z.enum(["faculty", "staff", "phd", "mtech", "btech"]);
+
+const peopleEntryCreateSchema = z.object({
+  category: peopleCategorySchema,
+  name: nullableStringField.optional(),
+  designation: nullableStringField.optional(),
+  specialization: nullableStringField.optional(),
+  department: nullableStringField.optional(),
+  year_label: nullableStringField.optional(),
+  email: nullableStringField.optional(),
+  phone: nullableStringField.optional(),
+  room: nullableStringField.optional(),
+  profile_url: nullableStringField.optional(),
+  image_url: nullableStringField.optional(),
+  resource_link: nullableStringField.optional(),
+  research_interests: nullableStringListField.optional(),
+  responsibilities: nullableStringListField.optional(),
+  sort_order: z.number().int().nonnegative().default(0),
+  is_active: z.number().int().min(0).max(1).default(1),
+});
+
+const peopleEntryPatchSchema = nonEmptyPatch({
+  category: peopleCategorySchema,
+  name: nullableStringField,
+  designation: nullableStringField,
+  specialization: nullableStringField,
+  department: nullableStringField,
+  year_label: nullableStringField,
+  email: nullableStringField,
+  phone: nullableStringField,
+  room: nullableStringField,
+  profile_url: nullableStringField,
+  image_url: nullableStringField,
+  resource_link: nullableStringField,
+  research_interests: nullableStringListField,
+  responsibilities: nullableStringListField,
+  sort_order: z.number().int().nonnegative(),
+  is_active: z.number().int().min(0).max(1),
+});
+
+const peopleEntryFields = [
+  "category",
+  "name",
+  "designation",
+  "specialization",
+  "department",
+  "year_label",
+  "email",
+  "phone",
+  "room",
+  "profile_url",
+  "image_url",
+  "resource_link",
+  "research_interests",
+  "responsibilities",
+  "sort_order",
+  "is_active",
+];
+
 const allowedImageMimeTypes = new Set([
   "image/png",
   "image/jpeg",
@@ -172,6 +233,45 @@ const allowedImageMimeTypes = new Set([
   "image/webp",
   "image/gif",
 ]);
+
+function parseStringList(value) {
+  const parsed = parseMaybeJson(value);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+}
+
+function serializePeopleEntry(entry) {
+  return {
+    ...entry,
+    research_interests: parseStringList(entry.research_interests),
+    responsibilities: parseStringList(entry.responsibilities),
+  };
+}
+
+function normalizePeoplePayload(payload) {
+  const nextPayload = { ...payload };
+
+  if (nextPayload.research_interests !== undefined) {
+    nextPayload.research_interests =
+      Array.isArray(nextPayload.research_interests) && nextPayload.research_interests.length > 0
+        ? JSON.stringify(nextPayload.research_interests)
+        : null;
+  }
+
+  if (nextPayload.responsibilities !== undefined) {
+    nextPayload.responsibilities =
+      Array.isArray(nextPayload.responsibilities) && nextPayload.responsibilities.length > 0
+        ? JSON.stringify(nextPayload.responsibilities)
+        : null;
+  }
+
+  return nextPayload;
+}
 
 function sanitizeUploadCategory(rawCategory) {
   const normalized = String(rawCategory || "general")
@@ -372,6 +472,10 @@ router.get("/content", async (_req, res) => {
       "SELECT id, title, excerpt, category, image_url, external_link, publish_date, is_active FROM news_items ORDER BY publish_date DESC, id DESC"
     );
 
+    const peopleEntries = await query(
+      "SELECT id, category, name, designation, specialization, department, year_label, email, phone, room, profile_url, image_url, resource_link, research_interests, responsibilities, sort_order, is_active FROM people_entries ORDER BY category ASC, sort_order ASC, id ASC"
+    );
+
     return res.json({
       siteSettings: siteSettings
         ? {
@@ -386,6 +490,7 @@ router.get("/content", async (_req, res) => {
       slides,
       stats,
       news,
+      peopleEntries: peopleEntries.map(serializePeopleEntry),
     });
   } catch (error) {
     return res.status(500).json({
@@ -854,6 +959,69 @@ router.delete("/news/:id", async (req, res) => {
 
   try {
     await query("DELETE FROM news_items WHERE id = ?", [id]);
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/people", async (_req, res) => {
+  try {
+    const peopleEntries = await query(
+      "SELECT id, category, name, designation, specialization, department, year_label, email, phone, room, profile_url, image_url, resource_link, research_interests, responsibilities, sort_order, is_active FROM people_entries ORDER BY category ASC, sort_order ASC, id ASC"
+    );
+
+    return res.json({
+      peopleEntries: peopleEntries.map(serializePeopleEntry),
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/people", async (req, res) => {
+  const parsed = peopleEntryCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  try {
+    const payload = normalizePeoplePayload(parsed.data);
+    const id = await insertRecord("people_entries", payload, peopleEntryFields);
+    return res.status(201).json({ id });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.patch("/people/:id", async (req, res) => {
+  const id = getIdFromParams(req, res);
+  if (!id) {
+    return;
+  }
+
+  const parsed = peopleEntryPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  try {
+    const payload = normalizePeoplePayload(parsed.data);
+    await patchRecordById("people_entries", id, payload, peopleEntryFields);
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete("/people/:id", async (req, res) => {
+  const id = getIdFromParams(req, res);
+  if (!id) {
+    return;
+  }
+
+  try {
+    await query("DELETE FROM people_entries WHERE id = ?", [id]);
     return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ error: error.message });

@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Mail, Phone, Award, BookOpen, Users, Search, GraduationCap, Building, User, Link as LinkIcon, Download, MapPin, ExternalLink } from 'lucide-react';
+import LoadingScreen from '../components/LoadingScreen';
+import { fetchPublicContentByKey, resolveMediaUrl } from '../lib/contentApi';
 
 const People = () => {
   const [activeTab, setActiveTab] = useState('regularFaculty');
   const [searchTerm, setSearchTerm] = useState('');
   const [specializationFilter, setSpecializationFilter] = useState('All');
+  const [peopleContent, setPeopleContent] = useState(null);
+  const [peopleLoadState, setPeopleLoadState] = useState('loading');
 
   // --- Faculty Data ---
   const regularFaculty = [
@@ -377,7 +381,36 @@ const People = () => {
     },
   ];
 
-  const specializations = ['All', ...new Set(regularFaculty.map(f => f.specialization))];
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadPeopleContent = async () => {
+      setPeopleLoadState('loading');
+
+      try {
+        const data = await fetchPublicContentByKey('people');
+        if (!isMounted) {
+          return;
+        }
+
+        setPeopleContent(data || null);
+        setPeopleLoadState('ready');
+      } catch (_error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setPeopleContent(null);
+        setPeopleLoadState('fallback');
+      }
+    };
+
+    loadPeopleContent();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // --- Staff Data ---
   const staff = [
@@ -557,22 +590,51 @@ const People = () => {
     { year: '2021 Batch', link: '/assets/student_lists/B.tech Student List 2021.pdf' },
   ];
 
+  const isBackendPeopleLoaded = peopleLoadState === 'ready' && Boolean(peopleContent);
+  const currentRegularFaculty = isBackendPeopleLoaded
+    ? (Array.isArray(peopleContent.regularFaculty) ? peopleContent.regularFaculty : [])
+    : regularFaculty;
+  const currentStaff = isBackendPeopleLoaded
+    ? (Array.isArray(peopleContent.staff) ? peopleContent.staff : [])
+    : staff;
+  const currentPhdStudents = isBackendPeopleLoaded
+    ? (Array.isArray(peopleContent.phdStudents) ? peopleContent.phdStudents : [])
+    : phdStudents;
+  const currentMtechStudents = isBackendPeopleLoaded
+    ? (Array.isArray(peopleContent.mtechStudents) ? peopleContent.mtechStudents : [])
+    : mtechStudents;
+  const currentBtechStudents = isBackendPeopleLoaded
+    ? (Array.isArray(peopleContent.btechStudents) ? peopleContent.btechStudents : [])
+    : btechStudents;
+
+  const fallbackFacultyImage = isBackendPeopleLoaded
+    ? '/uploads/people/placeholders/faculty-default.jpg'
+    : '/assets/faculty_pics/Gourab.jpg';
+  const fallbackStaffImage = isBackendPeopleLoaded
+    ? '/uploads/people/placeholders/staff-default.jpg'
+    : '/assets/staff pics/Rinki.jpg';
+  const fallbackStudentImage = isBackendPeopleLoaded
+    ? '/uploads/people/placeholders/student-default.jpg'
+    : '/assets/stu_images/phd/Aadarsh Singh.jpg';
+
+  const specializations = ['All', ...new Set(currentRegularFaculty.map((f) => f.specialization).filter(Boolean))];
+
   const tabs = [
-    { id: 'regularFaculty', label: 'Faculty', icon: Award, count: regularFaculty.length },
-    { id: 'staff', label: 'Staff', icon: Building, count: staff.length },
-    { id: 'phd', label: 'Ph.D. Students', icon: GraduationCap, count: phdStudents.length },
-    { id: 'mtech', label: 'M.Tech Students', icon: BookOpen, count: mtechStudents.length },
-    { id: 'btech', label: 'B.Tech Students', icon: User, count: btechStudents.length }
+    { id: 'regularFaculty', label: 'Faculty', icon: Award, count: currentRegularFaculty.length },
+    { id: 'staff', label: 'Staff', icon: Building, count: currentStaff.length },
+    { id: 'phd', label: 'Ph.D. Students', icon: GraduationCap, count: currentPhdStudents.length },
+    { id: 'mtech', label: 'M.Tech Students', icon: BookOpen, count: currentMtechStudents.length },
+    { id: 'btech', label: 'B.Tech Students', icon: User, count: currentBtechStudents.length }
   ];
 
   const getCurrentData = () => {
     switch (activeTab) {
-      case 'regularFaculty': return regularFaculty;
-      case 'staff': return staff;
-      case 'phd': return phdStudents;
-      case 'mtech': return mtechStudents;
-      case 'btech': return btechStudents;
-      default: return regularFaculty;
+      case 'regularFaculty': return currentRegularFaculty;
+      case 'staff': return currentStaff;
+      case 'phd': return currentPhdStudents;
+      case 'mtech': return currentMtechStudents;
+      case 'btech': return currentBtechStudents;
+      default: return currentRegularFaculty;
     }
   };
 
@@ -617,12 +679,16 @@ const People = () => {
       <div className="p-6">
         <div className="flex items-start space-x-5">
           <img
-            src={member.image}
+            src={resolveMediaUrl(member.image)}
             alt={member.name}
             className="w-24 h-24 rounded-full object-cover border-4 border-blue-100 group-hover:border-amber-200 transition-colors duration-300"
+            onError={(event) => {
+              event.currentTarget.onerror = null;
+              event.currentTarget.src = resolveMediaUrl(fallbackFacultyImage);
+            }}
           />
           <div className="flex-1">
-            <a href={member.url} target='__blank'><h3 className="text-xl font-bold text-gray-900 mb-1">{member.name}</h3></a>
+            <a href={member.url} target="_blank" rel="noopener noreferrer"><h3 className="text-xl font-bold text-gray-900 mb-1">{member.name}</h3></a>
             <p className="text-blue-800 font-semibold text-sm mb-3">{member.designation}</p>
             <p className="text-gray-600 text-xs font-medium mb-1">
               <span className="font-bold">Specialization:</span> {member.specialization}
@@ -667,9 +733,13 @@ const People = () => {
       <div className="p-6">
         <div className="text-center">
           <img
-            src={member.image}
+            src={resolveMediaUrl(member.image)}
             alt={member.name}
             className="w-32 h-32 rounded-full mx-auto mb-4 object-cover border-4 border-green-100"
+            onError={(event) => {
+              event.currentTarget.onerror = null;
+              event.currentTarget.src = resolveMediaUrl(fallbackStaffImage);
+            }}
           />
           <a href={member.url} target="_blank" rel="noopener noreferrer">
 
@@ -700,9 +770,13 @@ const People = () => {
     <div key={index} className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
       <div className="p-4">
         <img
-          src={student.image}
+          src={resolveMediaUrl(student.image)}
           alt={student.name}
           className="w-full h-48 object-cover rounded-md mb-3"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = resolveMediaUrl(fallbackStudentImage);
+          }}
         />
         <h3 className="text-md font-bold text-gray-900 text-center truncate">{student.name}</h3>
         {/* Added Email Link Below Name */}
@@ -752,7 +826,7 @@ const People = () => {
             <h3 className="text-xl font-bold text-gray-900 mb-2">{studentYear.year}</h3>
             <p className="text-gray-600 text-sm mb-4">List of Students</p>
             <a
-              href={studentYear.link}
+              href={resolveMediaUrl(studentYear.link)}
               target="_blank"
               rel="noopener noreferrer"
               className={`inline-flex items-center px-4 py-2 ${styles.btnBg} text-white text-sm font-medium rounded-lg ${styles.btnHover} transition-colors`}
@@ -820,6 +894,16 @@ const People = () => {
         return 'Search...';
     }
   };
+
+  if (peopleLoadState === 'loading') {
+    return (
+      <LoadingScreen
+        message="Loading people directory..."
+        fullScreen={false}
+        coverPage
+      />
+    );
+  }
 
 
   return (
@@ -922,23 +1006,23 @@ const People = () => {
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             <div className="text-center">
-              <div className="text-4xl font-bold text-amber-500 mb-2">{regularFaculty.length}</div>
+              <div className="text-4xl font-bold text-amber-500 mb-2">{currentRegularFaculty.length}</div>
               <div className="text-blue-100 font-medium">Faculty Members</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-amber-500 mb-2">{staff.length}</div>
+              <div className="text-4xl font-bold text-amber-500 mb-2">{currentStaff.length}</div>
               <div className="text-blue-100 font-medium">Staff Members</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-amber-500 mb-2">{phdStudents.length}</div>
+              <div className="text-4xl font-bold text-amber-500 mb-2">{currentPhdStudents.length}</div>
               <div className="text-blue-100 font-medium">Ph.D. Students</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-amber-500 mb-2">{mtechStudents.length}</div>
+              <div className="text-4xl font-bold text-amber-500 mb-2">{currentMtechStudents.length}</div>
               <div className="text-blue-100 font-medium">M.Tech Lists</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl font-bold text-amber-500 mb-2">{btechStudents.length}</div>
+              <div className="text-4xl font-bold text-amber-500 mb-2">{currentBtechStudents.length}</div>
               <div className="text-blue-100 font-medium">B.Tech Lists</div>
             </div>
           </div>

@@ -4,6 +4,17 @@ const { parseMaybeJson } = require("../utils/sql");
 
 const router = express.Router();
 
+function parseStringList(value) {
+  const parsed = parseMaybeJson(value);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+}
+
 router.get("/bootstrap", async (_req, res) => {
   try {
     const [siteSettings] = await query(
@@ -71,6 +82,98 @@ router.get("/home", async (_req, res) => {
   } catch (error) {
     return res.status(500).json({
       error: "Failed to fetch home content",
+      message: error.message,
+    });
+  }
+});
+
+router.get("/people", async (_req, res) => {
+  try {
+    const entries = await query(
+      "SELECT id, category, name, designation, specialization, department, year_label, email, phone, room, profile_url, image_url, resource_link, research_interests, responsibilities, sort_order FROM people_entries WHERE is_active = 1 ORDER BY sort_order ASC, id ASC"
+    );
+
+    const regularFaculty = [];
+    const staff = [];
+    const phdStudents = [];
+    const mtechStudents = [];
+    const btechStudents = [];
+
+    entries.forEach((entry) => {
+      if (entry.category === "faculty") {
+        regularFaculty.push({
+          id: entry.id,
+          name: entry.name,
+          designation: entry.designation,
+          specialization: entry.specialization,
+          email: entry.email,
+          phone: entry.phone,
+          room: entry.room,
+          image: entry.image_url,
+          url: entry.profile_url,
+          research: parseStringList(entry.research_interests),
+          sort_order: entry.sort_order,
+        });
+        return;
+      }
+
+      if (entry.category === "staff") {
+        staff.push({
+          id: entry.id,
+          name: entry.name,
+          designation: entry.designation,
+          department: entry.department,
+          email: entry.email,
+          phone: entry.phone,
+          image: entry.image_url,
+          url: entry.profile_url,
+          responsibilities: parseStringList(entry.responsibilities),
+          sort_order: entry.sort_order,
+        });
+        return;
+      }
+
+      if (entry.category === "phd") {
+        phdStudents.push({
+          id: entry.id,
+          name: entry.name,
+          email: entry.email,
+          image: entry.image_url,
+          sort_order: entry.sort_order,
+        });
+        return;
+      }
+
+      if (entry.category === "mtech") {
+        mtechStudents.push({
+          id: entry.id,
+          year: entry.year_label,
+          link: entry.resource_link,
+          sort_order: entry.sort_order,
+        });
+        return;
+      }
+
+      if (entry.category === "btech") {
+        btechStudents.push({
+          id: entry.id,
+          year: entry.year_label,
+          link: entry.resource_link,
+          sort_order: entry.sort_order,
+        });
+      }
+    });
+
+    return res.json({
+      regularFaculty,
+      staff,
+      phdStudents,
+      mtechStudents,
+      btechStudents,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch people content",
       message: error.message,
     });
   }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   adminLogout,
+  createPeopleEntry,
   createFooterLink,
   createHeroSlide,
   createHomeStat,
@@ -13,10 +14,12 @@ import {
   deleteHomeStat,
   deleteNavigationItem,
   deleteNewsItem,
+  deletePeopleEntry,
   deleteSocialLink,
   fetchAdminContent,
   fetchAdminSession,
   resolveMediaUrl,
+  updatePeopleEntry,
   updateFooterLink,
   updateHeroSlide,
   updateHomeContent,
@@ -110,6 +113,33 @@ const defaultNewsItem = {
   is_active: 1,
 };
 
+const defaultPeopleEntry = {
+  category: 'faculty',
+  name: '',
+  designation: '',
+  specialization: '',
+  department: '',
+  year_label: '',
+  email: '',
+  phone: '',
+  room: '',
+  profile_url: '',
+  image_url: '',
+  resource_link: '',
+  research_interests_text: '',
+  responsibilities_text: '',
+  sort_order: 0,
+  is_active: 1,
+};
+
+const peopleCategoryOptions = [
+  { value: 'faculty', label: 'Faculty' },
+  { value: 'staff', label: 'Staff' },
+  { value: 'phd', label: 'Ph.D. Student' },
+  { value: 'mtech', label: 'M.Tech Student List' },
+  { value: 'btech', label: 'B.Tech Student List' },
+];
+
 const adminSectionGroups = [
   {
     label: 'Global',
@@ -133,6 +163,10 @@ const adminSectionGroups = [
       { key: 'stats', label: 'Home Stats' },
       { key: 'news', label: 'News Items' },
     ],
+  },
+  {
+    label: 'People',
+    sections: [{ key: 'people', label: 'People Directory' }],
   },
 ];
 
@@ -168,6 +202,10 @@ const sectionDetails = {
   news: {
     title: 'News Items',
     description: 'News cards and update feed entries.',
+  },
+  people: {
+    title: 'People Directory',
+    description: 'Manage faculty, staff, students, and student list links.',
   },
 };
 
@@ -225,6 +263,10 @@ const AdminDashboard = () => {
   const [slides, setSlides] = useState([]);
   const [stats, setStats] = useState([]);
   const [newsItems, setNewsItems] = useState([]);
+  const [peopleEntries, setPeopleEntries] = useState([]);
+  const [isPeopleModalOpen, setIsPeopleModalOpen] = useState(false);
+  const [editingPeopleId, setEditingPeopleId] = useState(null);
+  const [peopleDraft, setPeopleDraft] = useState(defaultPeopleEntry);
 
   const clearMessages = () => {
     setError('');
@@ -264,6 +306,8 @@ const AdminDashboard = () => {
           }))
         : []
     );
+
+    setPeopleEntries(Array.isArray(data?.peopleEntries) ? data.peopleEntries : []);
   };
 
   useEffect(() => {
@@ -304,8 +348,10 @@ const AdminDashboard = () => {
       await action();
       await loadContent();
       setSuccessMessage(message);
+      return true;
     } catch (actionError) {
       setError(actionError.message || 'Request failed.');
+      return false;
     } finally {
       setIsWorking(false);
     }
@@ -565,6 +611,162 @@ const AdminDashboard = () => {
     runAction(
       () => deleteNewsItem(item.id),
       'News item deleted.'
+    );
+  };
+
+  const toNullableString = (value) => {
+    const nextValue = String(value || '').trim();
+    return nextValue.length > 0 ? nextValue : null;
+  };
+
+  const toStringArrayFromText = (value) => {
+    const text = String(value || '');
+
+    return text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+  };
+
+  const closePeopleModal = () => {
+    setIsPeopleModalOpen(false);
+    setEditingPeopleId(null);
+    setPeopleDraft(defaultPeopleEntry);
+  };
+
+  const openCreatePeopleModal = () => {
+    clearMessages();
+    setEditingPeopleId(null);
+    setPeopleDraft(defaultPeopleEntry);
+    setIsPeopleModalOpen(true);
+  };
+
+  const openEditPeopleModal = (entry) => {
+    clearMessages();
+    setEditingPeopleId(entry.id || null);
+    setPeopleDraft({
+      category: entry.category || 'faculty',
+      name: entry.name || '',
+      designation: entry.designation || '',
+      specialization: entry.specialization || '',
+      department: entry.department || '',
+      year_label: entry.year_label || '',
+      email: entry.email || '',
+      phone: entry.phone || '',
+      room: entry.room || '',
+      profile_url: entry.profile_url || '',
+      image_url: entry.image_url || '',
+      resource_link: entry.resource_link || '',
+      research_interests_text: Array.isArray(entry.research_interests)
+        ? entry.research_interests.join('\n')
+        : '',
+      responsibilities_text: Array.isArray(entry.responsibilities)
+        ? entry.responsibilities.join('\n')
+        : '',
+      sort_order: toInteger(entry.sort_order),
+      is_active: entry.is_active ? 1 : 0,
+    });
+    setIsPeopleModalOpen(true);
+  };
+
+  const savePeopleEntry = async () => {
+    const category = peopleDraft.category;
+    const isListType = category === 'mtech' || category === 'btech';
+
+    if (!category) {
+      setError('Please select a people category.');
+      setSuccessMessage('');
+      return;
+    }
+
+    if (isListType) {
+      if (!toNullableString(peopleDraft.year_label)) {
+        setError('Year label is required for student list entries.');
+        setSuccessMessage('');
+        return;
+      }
+
+      if (!toNullableString(peopleDraft.resource_link)) {
+        setError('Resource link is required for student list entries.');
+        setSuccessMessage('');
+        return;
+      }
+    } else if (!toNullableString(peopleDraft.name)) {
+      setError('Name is required for faculty, staff, and Ph.D. entries.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const payload = {
+      category,
+      name: toNullableString(peopleDraft.name),
+      designation: toNullableString(peopleDraft.designation),
+      specialization: toNullableString(peopleDraft.specialization),
+      department: toNullableString(peopleDraft.department),
+      year_label: toNullableString(peopleDraft.year_label),
+      email: toNullableString(peopleDraft.email),
+      phone: toNullableString(peopleDraft.phone),
+      room: toNullableString(peopleDraft.room),
+      profile_url: toNullableString(peopleDraft.profile_url),
+      image_url: toNullableString(peopleDraft.image_url),
+      resource_link: toNullableString(peopleDraft.resource_link),
+      research_interests: toStringArrayFromText(peopleDraft.research_interests_text),
+      responsibilities: toStringArrayFromText(peopleDraft.responsibilities_text),
+      sort_order: toInteger(peopleDraft.sort_order),
+      is_active: peopleDraft.is_active ? 1 : 0,
+    };
+
+    if (isListType) {
+      payload.image_url = null;
+      payload.research_interests = [];
+      payload.responsibilities = [];
+    }
+
+    if (category === 'phd') {
+      payload.designation = null;
+      payload.specialization = null;
+      payload.department = null;
+      payload.room = null;
+      payload.profile_url = null;
+      payload.research_interests = [];
+      payload.responsibilities = [];
+    }
+
+    if (category === 'staff') {
+      payload.specialization = null;
+      payload.year_label = null;
+      payload.resource_link = null;
+      payload.research_interests = [];
+    }
+
+    if (category === 'faculty') {
+      payload.department = null;
+      payload.year_label = null;
+      payload.resource_link = null;
+      payload.responsibilities = [];
+    }
+
+    const wasSuccessful = await runAction(
+      () =>
+        editingPeopleId
+          ? updatePeopleEntry(editingPeopleId, payload)
+          : createPeopleEntry(payload),
+      editingPeopleId ? 'People entry updated successfully.' : 'People entry created successfully.'
+    );
+
+    if (wasSuccessful) {
+      closePeopleModal();
+    }
+  };
+
+  const removePeople = (entry) => {
+    if (!entry.id) {
+      return;
+    }
+
+    runAction(
+      () => deletePeopleEntry(entry.id),
+      'People entry deleted.'
     );
   };
 
@@ -1918,6 +2120,414 @@ const AdminDashboard = () => {
             ))}
           </div>
               </section>
+            )}
+
+            {activeSection === 'people' && (
+              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">People Directory</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Use one table for faculty, staff, Ph.D. profiles, and M.Tech/B.Tech list links.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={openCreatePeopleModal}
+                    disabled={isWorking}
+                    className="px-3 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white text-sm font-medium disabled:bg-blue-400"
+                  >
+                    Add Entry
+                  </button>
+                </div>
+
+                <div className="admin-people-table-wrap overflow-x-auto border border-gray-200 rounded-lg">
+                  <table className="admin-people-table min-w-full text-sm">
+                    <thead className="bg-gray-100 text-gray-700">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-semibold">Category</th>
+                        <th className="text-left px-3 py-2 font-semibold">Name / Year</th>
+                        <th className="text-left px-3 py-2 font-semibold">Designation / Dept.</th>
+                        <th className="text-left px-3 py-2 font-semibold">Email / Link</th>
+                        <th className="text-left px-3 py-2 font-semibold">Sort</th>
+                        <th className="text-left px-3 py-2 font-semibold">Active</th>
+                        <th className="text-left px-3 py-2 font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {peopleEntries.map((entry) => (
+                        <tr key={`people-${entry.id}`} className="border-t border-gray-200">
+                          <td className="px-3 py-2 uppercase tracking-wide text-xs font-semibold text-gray-600">
+                            {entry.category}
+                          </td>
+                          <td className="px-3 py-2 text-gray-800 font-medium">
+                            {entry.name || entry.year_label || '-'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {entry.designation || entry.department || entry.specialization || '-'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700 break-all">
+                            {entry.email || entry.resource_link || '-'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700">{entry.sort_order}</td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {entry.is_active ? 'Yes' : 'No'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openEditPeopleModal(entry)}
+                                disabled={isWorking}
+                                className="px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removePeople(entry)}
+                                disabled={isWorking}
+                                className="px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+
+                      {peopleEntries.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
+                            No people entries available.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {isPeopleModalOpen && (
+              <div className="admin-modal-backdrop" role="presentation" onClick={closePeopleModal}>
+                <div className="admin-modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {editingPeopleId ? 'Edit People Entry' : 'Add People Entry'}
+                    </h3>
+
+                    <button
+                      type="button"
+                      onClick={closePeopleModal}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-3 mt-4">
+                    <label className="text-sm text-gray-700">
+                      Category
+                      <select
+                        className="mt-1"
+                        value={peopleDraft.category}
+                        onChange={(event) =>
+                          setPeopleDraft((previous) => ({
+                            ...previous,
+                            category: event.target.value,
+                          }))
+                        }
+                      >
+                        {peopleCategoryOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="text-sm text-gray-700">
+                      Sort Order
+                      <input
+                        type="number"
+                        className="mt-1"
+                        value={peopleDraft.sort_order}
+                        onChange={(event) =>
+                          setPeopleDraft((previous) => ({
+                            ...previous,
+                            sort_order: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+
+                    {(peopleDraft.category === 'mtech' || peopleDraft.category === 'btech') && (
+                      <>
+                        <label className="text-sm text-gray-700">
+                          Year Label
+                          <input
+                            className="mt-1"
+                            value={peopleDraft.year_label}
+                            onChange={(event) =>
+                              setPeopleDraft((previous) => ({
+                                ...previous,
+                                year_label: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+
+                        <label className="text-sm text-gray-700 md:col-span-2">
+                          List Link
+                          <input
+                            className="mt-1"
+                            value={peopleDraft.resource_link}
+                            onChange={(event) =>
+                              setPeopleDraft((previous) => ({
+                                ...previous,
+                                resource_link: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      </>
+                    )}
+
+                    {peopleDraft.category !== 'mtech' && peopleDraft.category !== 'btech' && (
+                      <>
+                        <label className="text-sm text-gray-700">
+                          Name
+                          <input
+                            className="mt-1"
+                            value={peopleDraft.name}
+                            onChange={(event) =>
+                              setPeopleDraft((previous) => ({
+                                ...previous,
+                                name: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+
+                        <label className="text-sm text-gray-700">
+                          Designation
+                          <input
+                            className="mt-1"
+                            value={peopleDraft.designation}
+                            onChange={(event) =>
+                              setPeopleDraft((previous) => ({
+                                ...previous,
+                                designation: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+
+                        {peopleDraft.category === 'faculty' && (
+                          <label className="text-sm text-gray-700">
+                            Specialization
+                            <input
+                              className="mt-1"
+                              value={peopleDraft.specialization}
+                              onChange={(event) =>
+                                setPeopleDraft((previous) => ({
+                                  ...previous,
+                                  specialization: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        )}
+
+                        {peopleDraft.category === 'staff' && (
+                          <label className="text-sm text-gray-700">
+                            Department
+                            <input
+                              className="mt-1"
+                              value={peopleDraft.department}
+                              onChange={(event) =>
+                                setPeopleDraft((previous) => ({
+                                  ...previous,
+                                  department: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        )}
+
+                        <label className="text-sm text-gray-700">
+                          Email
+                          <input
+                            className="mt-1"
+                            value={peopleDraft.email}
+                            onChange={(event) =>
+                              setPeopleDraft((previous) => ({
+                                ...previous,
+                                email: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+
+                        <label className="text-sm text-gray-700">
+                          Phone
+                          <input
+                            className="mt-1"
+                            value={peopleDraft.phone}
+                            onChange={(event) =>
+                              setPeopleDraft((previous) => ({
+                                ...previous,
+                                phone: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+
+                        {peopleDraft.category === 'faculty' && (
+                          <label className="text-sm text-gray-700">
+                            Room
+                            <input
+                              className="mt-1"
+                              value={peopleDraft.room}
+                              onChange={(event) =>
+                                setPeopleDraft((previous) => ({
+                                  ...previous,
+                                  room: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        )}
+
+                        {(peopleDraft.category === 'faculty' || peopleDraft.category === 'staff') && (
+                          <label className="text-sm text-gray-700 md:col-span-2">
+                            Profile URL
+                            <input
+                              className="mt-1"
+                              value={peopleDraft.profile_url}
+                              onChange={(event) =>
+                                setPeopleDraft((previous) => ({
+                                  ...previous,
+                                  profile_url: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        )}
+
+                        <label className="text-sm text-gray-700 md:col-span-2">
+                          Image URL
+                          <input
+                            className="mt-1"
+                            value={peopleDraft.image_url}
+                            onChange={(event) =>
+                              setPeopleDraft((previous) => ({
+                                ...previous,
+                                image_url: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+
+                        <label className="text-sm text-gray-700 md:col-span-2">
+                          Upload Image
+                          <input
+                            className="mt-1"
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) =>
+                              uploadImage(event.target.files?.[0], 'people', (uploadedUrl) => {
+                                setPeopleDraft((previous) => ({
+                                  ...previous,
+                                  image_url: uploadedUrl,
+                                }));
+                              })
+                            }
+                          />
+                        </label>
+
+                        {peopleDraft.image_url && (
+                          <div className="md:col-span-2">
+                            <img
+                              src={resolveMediaUrl(peopleDraft.image_url)}
+                              alt={peopleDraft.name || 'People image preview'}
+                              className="h-40 w-full object-contain border border-gray-200 rounded"
+                            />
+                          </div>
+                        )}
+
+                        {peopleDraft.category === 'faculty' && (
+                          <label className="text-sm text-gray-700 md:col-span-2">
+                            Research Interests (one per line)
+                            <textarea
+                              className="mt-1"
+                              value={peopleDraft.research_interests_text}
+                              onChange={(event) =>
+                                setPeopleDraft((previous) => ({
+                                  ...previous,
+                                  research_interests_text: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        )}
+
+                        {peopleDraft.category === 'staff' && (
+                          <label className="text-sm text-gray-700 md:col-span-2">
+                            Responsibilities (one per line)
+                            <textarea
+                              className="mt-1"
+                              value={peopleDraft.responsibilities_text}
+                              onChange={(event) =>
+                                setPeopleDraft((previous) => ({
+                                  ...previous,
+                                  responsibilities_text: event.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        )}
+                      </>
+                    )}
+
+                    <label className="text-sm text-gray-700 md:col-span-2 flex items-center gap-2 mt-1">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(peopleDraft.is_active)}
+                        onChange={(event) =>
+                          setPeopleDraft((previous) => ({
+                            ...previous,
+                            is_active: event.target.checked ? 1 : 0,
+                          }))
+                        }
+                      />
+                      Active
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 mt-5">
+                    <button
+                      type="button"
+                      onClick={closePeopleModal}
+                      disabled={isWorking}
+                      className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={savePeopleEntry}
+                      disabled={isWorking}
+                      className="px-3 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white text-sm font-medium disabled:bg-blue-400"
+                    >
+                      {editingPeopleId ? 'Save Changes' : 'Create Entry'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
