@@ -68,6 +68,32 @@ CREATE TABLE IF NOT EXISTS home_content (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS about_content (
+  id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+  hero_title VARCHAR(255) NOT NULL,
+  hero_subtitle TEXT NOT NULL,
+  story_title VARCHAR(255) NOT NULL,
+  story_paragraph_1 TEXT NOT NULL,
+  story_paragraph_2 TEXT NOT NULL,
+  story_paragraph_3 TEXT NOT NULL,
+  story_image_url VARCHAR(512) NOT NULL,
+  mission_title VARCHAR(160) NOT NULL,
+  mission_description TEXT NOT NULL,
+  vision_title VARCHAR(160) NOT NULL,
+  vision_description TEXT NOT NULL,
+  values_title VARCHAR(255) NOT NULL,
+  values_subtitle TEXT NOT NULL,
+  values_items JSON NOT NULL,
+  milestones_title VARCHAR(255) NOT NULL,
+  milestones_subtitle TEXT NOT NULL,
+  milestones JSON NOT NULL,
+  stats_title VARCHAR(255) NOT NULL,
+  stats_subtitle TEXT NOT NULL,
+  stats_items JSON NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS home_hero_slides (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   image_url VARCHAR(512) NOT NULL,

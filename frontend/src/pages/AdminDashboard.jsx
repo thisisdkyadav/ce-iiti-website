@@ -22,6 +22,7 @@ import {
   updatePeopleEntry,
   updateFooterLink,
   updateHeroSlide,
+  updateAboutContent,
   updateHomeContent,
   updateHomeStat,
   updateNavigationItem,
@@ -60,6 +61,48 @@ const defaultHomeContent = {
   cta_tertiary_text: '',
   cta_tertiary_link: '',
 };
+
+const defaultAboutContent = {
+  hero_title: '',
+  hero_subtitle: '',
+  story_title: '',
+  story_paragraph_1: '',
+  story_paragraph_2: '',
+  story_paragraph_3: '',
+  story_image_url: '',
+  mission_title: '',
+  mission_description: '',
+  vision_title: '',
+  vision_description: '',
+  values_title: '',
+  values_subtitle: '',
+  values_items: [],
+  milestones_title: '',
+  milestones_subtitle: '',
+  milestones: [],
+  stats_title: '',
+  stats_subtitle: '',
+  stats_items: [],
+};
+
+const defaultAboutValueItem = {
+  icon_name: 'Award',
+  title: '',
+  description: '',
+};
+
+const defaultAboutMilestoneItem = {
+  year: '',
+  event: '',
+};
+
+const defaultAboutStatItem = {
+  label: '',
+  value: 0,
+  suffix: '',
+};
+
+const aboutValueIconOptions = ['Award', 'Users', 'Target', 'BookOpen'];
 
 const defaultNavigationItem = {
   label: '',
@@ -146,6 +189,7 @@ const adminSectionGroups = [
     sections: [
       { key: 'site-settings', label: 'Site Settings' },
       { key: 'home-content', label: 'Home Content' },
+      { key: 'about-content', label: 'About Content' },
     ],
   },
   {
@@ -178,6 +222,10 @@ const sectionDetails = {
   'home-content': {
     title: 'Home Content',
     description: 'Welcome block and CTA text shown on homepage.',
+  },
+  'about-content': {
+    title: 'About Content',
+    description: 'Hero, story, mission/vision, values, milestones, and stats for About page.',
   },
   navigation: {
     title: 'Navigation Items',
@@ -257,6 +305,7 @@ const AdminDashboard = () => {
 
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const [homeContent, setHomeContent] = useState(defaultHomeContent);
+  const [aboutContent, setAboutContent] = useState(defaultAboutContent);
   const [navigationItems, setNavigationItems] = useState([]);
   const [socialLinks, setSocialLinks] = useState([]);
   const [footerLinks, setFooterLinks] = useState([]);
@@ -278,6 +327,7 @@ const AdminDashboard = () => {
 
     const loadedSiteSettings = data?.siteSettings || {};
     const loadedHomeContent = data?.homeContent || {};
+    const loadedAboutContent = data?.aboutContent || {};
 
     setSiteSettings({
       ...defaultSiteSettings,
@@ -290,6 +340,20 @@ const AdminDashboard = () => {
     setHomeContent({
       ...defaultHomeContent,
       ...loadedHomeContent,
+    });
+
+    setAboutContent({
+      ...defaultAboutContent,
+      ...loadedAboutContent,
+      values_items: Array.isArray(loadedAboutContent.values_items)
+        ? loadedAboutContent.values_items
+        : [],
+      milestones: Array.isArray(loadedAboutContent.milestones)
+        ? loadedAboutContent.milestones
+        : [],
+      stats_items: Array.isArray(loadedAboutContent.stats_items)
+        ? loadedAboutContent.stats_items
+        : [],
     });
 
     setNavigationItems(Array.isArray(data?.navigation) ? data.navigation : []);
@@ -423,6 +487,87 @@ const AdminDashboard = () => {
       () => updateHomeContent(payload),
       'Home content updated successfully.'
     );
+  };
+
+  const saveAboutContent = () => {
+    const valuesItems = (Array.isArray(aboutContent.values_items) ? aboutContent.values_items : [])
+      .map((item) => ({
+        icon_name: item?.icon_name || 'Award',
+        title: String(item?.title || '').trim(),
+        description: String(item?.description || '').trim(),
+      }))
+      .filter((item) => item.title || item.description);
+
+    if (valuesItems.some((item) => !item.title || !item.description)) {
+      setError('Each core value item must include both title and description, or be removed.');
+      return;
+    }
+
+    const milestones = (Array.isArray(aboutContent.milestones) ? aboutContent.milestones : [])
+      .map((item) => ({
+        year: String(item?.year || '').trim(),
+        event: String(item?.event || '').trim(),
+      }))
+      .filter((item) => item.year || item.event);
+
+    if (milestones.some((item) => !item.year || !item.event)) {
+      setError('Each milestone must include both year and event, or be removed.');
+      return;
+    }
+
+    const statsItems = (Array.isArray(aboutContent.stats_items) ? aboutContent.stats_items : [])
+      .map((item) => ({
+        label: String(item?.label || '').trim(),
+        value: toInteger(item?.value, 0),
+        suffix: String(item?.suffix || '').trim(),
+      }))
+      .filter((item) => item.label || item.value || item.suffix);
+
+    if (statsItems.some((item) => !item.label)) {
+      setError('Each stat item must include a label, or be removed.');
+      return;
+    }
+
+    const payload = {
+      ...aboutContent,
+      values_items: valuesItems,
+      milestones,
+      stats_items: statsItems,
+    };
+
+    delete payload.id;
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    runAction(
+      () => updateAboutContent(payload),
+      'About content updated successfully.'
+    );
+  };
+
+  const addAboutListItem = (field, itemTemplate) => {
+    setAboutContent((previous) => ({
+      ...previous,
+      [field]: [...(Array.isArray(previous[field]) ? previous[field] : []), { ...itemTemplate }],
+    }));
+  };
+
+  const updateAboutListItem = (field, index, nextItem) => {
+    setAboutContent((previous) => ({
+      ...previous,
+      [field]: (Array.isArray(previous[field]) ? previous[field] : []).map((item, currentIndex) =>
+        currentIndex === index ? { ...item, ...nextItem } : item
+      ),
+    }));
+  };
+
+  const removeAboutListItem = (field, index) => {
+    setAboutContent((previous) => ({
+      ...previous,
+      [field]: (Array.isArray(previous[field]) ? previous[field] : []).filter(
+        (_item, currentIndex) => currentIndex !== index
+      ),
+    }));
   };
 
   const saveNavigationItem = (item) => {
@@ -1401,6 +1546,492 @@ const AdminDashboard = () => {
               </div>
             ))}
           </div>
+              </section>
+            )}
+
+            {activeSection === 'about-content' && (
+              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900">About Content</h2>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={aboutContent.hero_title}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          hero_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={aboutContent.hero_subtitle}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          hero_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Story Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={aboutContent.story_title}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          story_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Story Paragraph 1
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
+                      value={aboutContent.story_paragraph_1}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          story_paragraph_1: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Story Paragraph 2
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
+                      value={aboutContent.story_paragraph_2}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          story_paragraph_2: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Story Paragraph 3
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
+                      value={aboutContent.story_paragraph_3}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          story_paragraph_3: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Story Image URL
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={aboutContent.story_image_url}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          story_image_url: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Upload Story Image
+                    <input
+                      className="mt-1 block"
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        uploadImage(event.target.files?.[0], 'about', (uploadedUrl) => {
+                          setAboutContent((previous) => ({
+                            ...previous,
+                            story_image_url: uploadedUrl,
+                          }));
+                        })
+                      }
+                    />
+                  </label>
+
+                  {aboutContent.story_image_url && (
+                    <div className="md:col-span-2">
+                      <img
+                        src={resolveMediaUrl(aboutContent.story_image_url)}
+                        alt="About story"
+                        className="h-40 w-full object-cover border border-gray-200 rounded"
+                      />
+                    </div>
+                  )}
+
+                  <label className="text-sm text-gray-700">
+                    Mission Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={aboutContent.mission_title}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          mission_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Vision Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={aboutContent.vision_title}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          vision_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Mission Description
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
+                      value={aboutContent.mission_description}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          mission_description: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Vision Description
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
+                      value={aboutContent.vision_description}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          vision_description: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Values Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={aboutContent.values_title}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          values_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Values Section Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={aboutContent.values_subtitle}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          values_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Core Values Items</h3>
+                      <button
+                        type="button"
+                        onClick={() => addAboutListItem('values_items', defaultAboutValueItem)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Value
+                      </button>
+                    </div>
+
+                    {(Array.isArray(aboutContent.values_items) ? aboutContent.values_items : []).length === 0 && (
+                      <p className="text-xs text-gray-500">No values added yet.</p>
+                    )}
+
+                    {(Array.isArray(aboutContent.values_items) ? aboutContent.values_items : []).map((item, index) => (
+                      <div key={`about-value-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
+                        <label className="text-xs text-gray-700 md:col-span-2">
+                          Icon
+                          <select
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={item.icon_name || 'Award'}
+                            onChange={(event) =>
+                              updateAboutListItem('values_items', index, {
+                                icon_name: event.target.value,
+                              })
+                            }
+                          >
+                            {aboutValueIconOptions.map((iconName) => (
+                              <option key={iconName} value={iconName}>
+                                {iconName}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-3">
+                          Title
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={item.title || ''}
+                            onChange={(event) =>
+                              updateAboutListItem('values_items', index, {
+                                title: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-6">
+                          Description
+                          <textarea
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm"
+                            value={item.description || ''}
+                            onChange={(event) =>
+                              updateAboutListItem('values_items', index, {
+                                description: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+
+                        <div className="md:col-span-1 flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => removeAboutListItem('values_items', index)}
+                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Milestones Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={aboutContent.milestones_title}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          milestones_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Milestones Section Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={aboutContent.milestones_subtitle}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          milestones_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Milestones</h3>
+                      <button
+                        type="button"
+                        onClick={() => addAboutListItem('milestones', defaultAboutMilestoneItem)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Milestone
+                      </button>
+                    </div>
+
+                    {(Array.isArray(aboutContent.milestones) ? aboutContent.milestones : []).length === 0 && (
+                      <p className="text-xs text-gray-500">No milestones added yet.</p>
+                    )}
+
+                    {(Array.isArray(aboutContent.milestones) ? aboutContent.milestones : []).map((item, index) => (
+                      <div key={`about-milestone-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
+                        <label className="text-xs text-gray-700 md:col-span-3">
+                          Year
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={item.year || ''}
+                            onChange={(event) =>
+                              updateAboutListItem('milestones', index, {
+                                year: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-8">
+                          Event
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={item.event || ''}
+                            onChange={(event) =>
+                              updateAboutListItem('milestones', index, {
+                                event: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+
+                        <div className="md:col-span-1 flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => removeAboutListItem('milestones', index)}
+                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Stats Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={aboutContent.stats_title}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          stats_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Stats Section Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={aboutContent.stats_subtitle}
+                      onChange={(event) =>
+                        setAboutContent((previous) => ({
+                          ...previous,
+                          stats_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Stats Items</h3>
+                      <button
+                        type="button"
+                        onClick={() => addAboutListItem('stats_items', defaultAboutStatItem)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Stat
+                      </button>
+                    </div>
+
+                    {(Array.isArray(aboutContent.stats_items) ? aboutContent.stats_items : []).length === 0 && (
+                      <p className="text-xs text-gray-500">No stats added yet.</p>
+                    )}
+
+                    {(Array.isArray(aboutContent.stats_items) ? aboutContent.stats_items : []).map((item, index) => (
+                      <div key={`about-stat-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
+                        <label className="text-xs text-gray-700 md:col-span-5">
+                          Label
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={item.label || ''}
+                            onChange={(event) =>
+                              updateAboutListItem('stats_items', index, {
+                                label: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-3">
+                          Value
+                          <input
+                            type="number"
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={item.value ?? 0}
+                            onChange={(event) =>
+                              updateAboutListItem('stats_items', index, {
+                                value: toInteger(event.target.value, 0),
+                              })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-3">
+                          Suffix
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={item.suffix || ''}
+                            onChange={(event) =>
+                              updateAboutListItem('stats_items', index, {
+                                suffix: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+
+                        <div className="md:col-span-1 flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => removeAboutListItem('stats_items', index)}
+                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveAboutContent}
+                  disabled={isWorking}
+                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
+                >
+                  Save About Content
+                </button>
               </section>
             )}
 

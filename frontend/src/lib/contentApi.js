@@ -21,8 +21,8 @@ const publicContentFetchers = {
     optional: false,
   },
   about: {
-    fetcher: optionalPublicEndpointFetcher("/api/public/about"),
-    optional: true,
+    fetcher: () => requestJson("/api/public/about"),
+    optional: false,
   },
   academics: {
     fetcher: optionalPublicEndpointFetcher("/api/public/academics"),
@@ -321,6 +321,13 @@ export function deleteFooterLink(id) {
 
 export function updateHomeContent(payload) {
   return adminRequest("/api/admin/home-content", {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function updateAboutContent(payload) {
+  return adminRequest("/api/admin/about-content", {
     method: "PUT",
     body: payload,
   });

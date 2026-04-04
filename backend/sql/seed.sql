@@ -4,6 +4,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE admin_sessions;
 TRUNCATE TABLE news_items;
 TRUNCATE TABLE people_entries;
+TRUNCATE TABLE about_content;
 TRUNCATE TABLE home_stats;
 TRUNCATE TABLE home_hero_slides;
 TRUNCATE TABLE footer_links;
@@ -125,6 +126,74 @@ ON DUPLICATE KEY UPDATE
   cta_secondary_link = VALUES(cta_secondary_link),
   cta_tertiary_text = VALUES(cta_tertiary_text),
   cta_tertiary_link = VALUES(cta_tertiary_link);
+
+INSERT INTO about_content (
+  id,
+  hero_title,
+  hero_subtitle,
+  story_title,
+  story_paragraph_1,
+  story_paragraph_2,
+  story_paragraph_3,
+  story_image_url,
+  mission_title,
+  mission_description,
+  vision_title,
+  vision_description,
+  values_title,
+  values_subtitle,
+  values_items,
+  milestones_title,
+  milestones_subtitle,
+  milestones,
+  stats_title,
+  stats_subtitle,
+  stats_items
+)
+VALUES (
+  1,
+  'About Our Department',
+  'Excellence in civil engineering education, research, and innovation',
+  'Our Story',
+  'The Department of Civil Engineering at IIT Indore has grown rapidly to become a center for academic and research excellence. We are dedicated to creating world-class engineers who contribute to the sustainable development of global infrastructure.',
+  'Since our inception, we have evolved into a thriving academic community with distinguished faculty, state-of-the-art facilities, and a strong network of alumni working in leading organizations worldwide.',
+  'Our department is committed to addressing the challenges of modern infrastructure through innovative research, comprehensive education programs, and strong industry partnerships.',
+  '/uploads/home/groupphoto2.jpeg',
+  'Our Mission',
+  'To provide world-class education in civil engineering, conduct cutting-edge research that addresses societal needs, and develop leaders who will shape the future of sustainable infrastructure development in India and beyond.',
+  'Our Vision',
+  'To be recognized as a premier department of civil engineering that contributes significantly to technological advancement, sustainable development, and the creation of innovative solutions for complex engineering challenges.',
+  'Our Core Values',
+  'The principles that guide our approach to education, research, and service',
+  '[{"icon_name":"Award","title":"Excellence","description":"Striving for the highest standards in education, research, and innovation in civil engineering."},{"icon_name":"Users","title":"Collaboration","description":"Fostering teamwork, partnerships, and knowledge sharing within our academic community."},{"icon_name":"Target","title":"Innovation","description":"Pioneering cutting-edge research and sustainable solutions for modern infrastructure challenges."},{"icon_name":"BookOpen","title":"Knowledge","description":"Committed to advancing the frontiers of civil engineering through continuous learning and discovery."}]',
+  'Our Journey',
+  'Key milestones in the development of our department',
+  '[{"year":"2009","event":"Foundation of IIT Indore"},{"year":"2016","event":"Department of Civil Engineering established & First B.Tech batch admitted"},{"year":"2020","event":"Reached milestone of 200+ alumni"},{"year":"2023","event":"First M.Tech batch admitted"},{"year":"2025","event":"Celebrating 10+ years of excellence"}]',
+  'Department at a Glance',
+  'Numbers that reflect our growth and impact over the years',
+  '[{"label":"Faculty Members","value":17,"suffix":""},{"label":"Alumni","value":500,"suffix":"+"},{"label":"Research Papers","value":1000,"suffix":"+"},{"label":"Active Projects","value":50,"suffix":"+"}]'
+)
+ON DUPLICATE KEY UPDATE
+  hero_title = VALUES(hero_title),
+  hero_subtitle = VALUES(hero_subtitle),
+  story_title = VALUES(story_title),
+  story_paragraph_1 = VALUES(story_paragraph_1),
+  story_paragraph_2 = VALUES(story_paragraph_2),
+  story_paragraph_3 = VALUES(story_paragraph_3),
+  story_image_url = VALUES(story_image_url),
+  mission_title = VALUES(mission_title),
+  mission_description = VALUES(mission_description),
+  vision_title = VALUES(vision_title),
+  vision_description = VALUES(vision_description),
+  values_title = VALUES(values_title),
+  values_subtitle = VALUES(values_subtitle),
+  values_items = VALUES(values_items),
+  milestones_title = VALUES(milestones_title),
+  milestones_subtitle = VALUES(milestones_subtitle),
+  milestones = VALUES(milestones),
+  stats_title = VALUES(stats_title),
+  stats_subtitle = VALUES(stats_subtitle),
+  stats_items = VALUES(stats_items);
 
 INSERT INTO home_hero_slides (image_url, title, subtitle, cta_text, cta_link, sort_order, is_active)
 VALUES

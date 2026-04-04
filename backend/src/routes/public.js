@@ -87,6 +87,32 @@ router.get("/home", async (_req, res) => {
   }
 });
 
+router.get("/about", async (_req, res) => {
+  try {
+    const [aboutContent] = await query(
+      "SELECT * FROM about_content WHERE id = 1 LIMIT 1"
+    );
+
+    if (!aboutContent) {
+      return res.json({ aboutContent: null });
+    }
+
+    return res.json({
+      aboutContent: {
+        ...aboutContent,
+        values_items: parseMaybeJson(aboutContent.values_items) || [],
+        milestones: parseMaybeJson(aboutContent.milestones) || [],
+        stats_items: parseMaybeJson(aboutContent.stats_items) || [],
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch about content",
+      message: error.message,
+    });
+  }
+});
+
 router.get("/people", async (_req, res) => {
   try {
     const entries = await query(

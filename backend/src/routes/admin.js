@@ -61,6 +61,46 @@ const homeContentPatchSchema = nonEmptyPatch({
   cta_tertiary_link: z.string().min(1),
 });
 
+const aboutValueItemSchema = z.object({
+  icon_name: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+});
+
+const aboutMilestoneItemSchema = z.object({
+  year: z.string().min(1),
+  event: z.string().min(1),
+});
+
+const aboutStatItemSchema = z.object({
+  label: z.string().min(1),
+  value: z.number().int().nonnegative(),
+  suffix: z.string(),
+});
+
+const aboutContentPatchSchema = nonEmptyPatch({
+  hero_title: z.string().min(1),
+  hero_subtitle: z.string().min(1),
+  story_title: z.string().min(1),
+  story_paragraph_1: z.string().min(1),
+  story_paragraph_2: z.string().min(1),
+  story_paragraph_3: z.string().min(1),
+  story_image_url: z.string().min(1),
+  mission_title: z.string().min(1),
+  mission_description: z.string().min(1),
+  vision_title: z.string().min(1),
+  vision_description: z.string().min(1),
+  values_title: z.string().min(1),
+  values_subtitle: z.string().min(1),
+  values_items: z.array(aboutValueItemSchema),
+  milestones_title: z.string().min(1),
+  milestones_subtitle: z.string().min(1),
+  milestones: z.array(aboutMilestoneItemSchema),
+  stats_title: z.string().min(1),
+  stats_subtitle: z.string().min(1),
+  stats_items: z.array(aboutStatItemSchema),
+});
+
 const navigationItemCreateSchema = z.object({
   label: z.string().min(1),
   href: z.string().min(1),
@@ -273,6 +313,37 @@ function normalizePeoplePayload(payload) {
   return nextPayload;
 }
 
+function serializeAboutContent(aboutContent) {
+  if (!aboutContent) {
+    return null;
+  }
+
+  return {
+    ...aboutContent,
+    values_items: parseMaybeJson(aboutContent.values_items) || [],
+    milestones: parseMaybeJson(aboutContent.milestones) || [],
+    stats_items: parseMaybeJson(aboutContent.stats_items) || [],
+  };
+}
+
+function normalizeAboutPayload(payload) {
+  const nextPayload = { ...payload };
+
+  if (nextPayload.values_items !== undefined) {
+    nextPayload.values_items = JSON.stringify(nextPayload.values_items || []);
+  }
+
+  if (nextPayload.milestones !== undefined) {
+    nextPayload.milestones = JSON.stringify(nextPayload.milestones || []);
+  }
+
+  if (nextPayload.stats_items !== undefined) {
+    nextPayload.stats_items = JSON.stringify(nextPayload.stats_items || []);
+  }
+
+  return nextPayload;
+}
+
 function sanitizeUploadCategory(rawCategory) {
   const normalized = String(rawCategory || "general")
     .toLowerCase()
@@ -448,6 +519,10 @@ router.get("/content", async (_req, res) => {
       "SELECT * FROM home_content WHERE id = 1 LIMIT 1"
     );
 
+    const [aboutContent] = await query(
+      "SELECT * FROM about_content WHERE id = 1 LIMIT 1"
+    );
+
     const navigation = await query(
       "SELECT id, label, href, sort_order, is_active FROM navigation_items ORDER BY sort_order ASC, id ASC"
     );
@@ -484,6 +559,7 @@ router.get("/content", async (_req, res) => {
           }
         : null,
       homeContent: homeContent || null,
+      aboutContent: serializeAboutContent(aboutContent),
       navigation,
       socialLinks,
       footerLinks,
@@ -769,6 +845,53 @@ router.put("/home-content", async (req, res) => {
 
     await query(
       `UPDATE home_content SET ${update.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
+      update.values
+    );
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/about-content", async (req, res) => {
+  const parsed = aboutContentPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const allowedFields = [
+    "hero_title",
+    "hero_subtitle",
+    "story_title",
+    "story_paragraph_1",
+    "story_paragraph_2",
+    "story_paragraph_3",
+    "story_image_url",
+    "mission_title",
+    "mission_description",
+    "vision_title",
+    "vision_description",
+    "values_title",
+    "values_subtitle",
+    "values_items",
+    "milestones_title",
+    "milestones_subtitle",
+    "milestones",
+    "stats_title",
+    "stats_subtitle",
+    "stats_items",
+  ];
+
+  try {
+    const payload = normalizeAboutPayload(parsed.data);
+    const update = buildUpdateClause(payload, allowedFields);
+    if (!update) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    await query(
+      `UPDATE about_content SET ${update.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
       update.values
     );
 
