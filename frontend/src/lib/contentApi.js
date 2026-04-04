@@ -42,7 +42,7 @@ const publicContentFetchers = {
   },
   contact: {
     fetcher: optionalPublicEndpointFetcher("/api/public/contact"),
-    optional: true,
+    optional: false,
   },
 };
 
@@ -349,6 +349,13 @@ export function updateSpecializationsContent(payload) {
 
 export function updateEventsContent(payload) {
   return adminRequest("/api/admin/events-content", {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function updateContactContent(payload) {
+  return adminRequest("/api/admin/contact-content", {
     method: "PUT",
     body: payload,
   });

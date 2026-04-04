@@ -4,6 +4,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE admin_sessions;
 TRUNCATE TABLE news_items;
 TRUNCATE TABLE people_entries;
+TRUNCATE TABLE contact_content;
 TRUNCATE TABLE events_content;
 TRUNCATE TABLE specializations_content;
 TRUNCATE TABLE academics_content;
@@ -332,6 +333,71 @@ ON DUPLICATE KEY UPDATE
   no_past_message = VALUES(no_past_message),
   upcoming_events = VALUES(upcoming_events),
   past_events = VALUES(past_events);
+
+INSERT INTO contact_content (
+  id,
+  hero_title,
+  hero_subtitle,
+  info_section_title,
+  info_section_subtitle,
+  contact_info_cards,
+  form_title,
+  form_submit_message,
+  form_categories,
+  key_contacts_title,
+  key_contacts_subtitle,
+  key_contacts,
+  quick_links_title,
+  quick_links_subtitle,
+  quick_links,
+  stay_connected_title,
+  stay_connected_subtitle,
+  stay_connected_links,
+  footer_cards,
+  map_embed_url
+)
+VALUES (
+  1,
+  'Contact Us',
+  'Get in touch with us for admissions, research opportunities, collaborations, or any other inquiries',
+  'Get in Touch',
+  'We are here to help and answer any questions you might have',
+  '[{"icon_name":"MapPin","title":"Address","details":["Pod 1C-403","Department of Civil Engineering","Indian Institute of Technology Indore","Khandwa Road, Simrol","Indore 453552, Madhya Pradesh, India"]},{"icon_name":"Phone","title":"Phone","details":["Department Office: 0731-660 3477","HOD Office: 0731-660 3188"]},{"icon_name":"Mail","title":"Email","details":["Department: ceoffice@iiti.ac.in","HOD: hodce@iiti.ac.in"]},{"icon_name":"Clock","title":"Office Hours","details":["Monday - Friday: 10:00 AM - 6:00 PM"]}]',
+  'Send us a Message',
+  'Thank you for your message! We will get back to you soon.',
+  '["General Inquiry","Admission Information","Research Collaboration","Industry Partnership","Alumni Relations","Media Inquiry"]',
+  'Key Contacts',
+  'Direct contacts for specific departments and services',
+  '[{"name":"Dr. Gourab Sil","designation":"Head of Department","email":"hodce@iiti.ac.in","phone":"0731-660 3188","office":"Pod 1C-403, IIT Indore"},{"name":"Ms. Rinki Seth","designation":"Senior Assistant","email":"ceoffice@iiti.ac.in","phone":"0731-660 3477","office":"Pod 1C-403, IIT Indore"},{"name":"Ms. Divya Bangar","designation":"Junior Superintendent","email":"ceoffice@iiti.ac.in","phone":"0731-660 3477","office":"Pod 1C-403, IIT Indore"}]',
+  'Quick Links',
+  'Find specific information quickly',
+  '[{"title":"Admission Information","description":"Details about admission procedures and requirements","url":null},{"title":"Research Collaboration","description":"Opportunities for research partnerships and projects","url":null},{"title":"Industry Partnership","description":"Corporate collaboration and consultancy services","url":null},{"title":"Alumni Network","description":"Connect with our alumni community","url":"https://alumni.iiti.ac.in/"},{"title":"Student Services","description":"Academic support and student facilities","url":null},{"title":"Media Inquiries","description":"Press releases and media-related queries","url":null}]',
+  'Stay Connected',
+  'Follow us on social media for the latest updates, news, and events',
+  '[{"icon_name":"Globe","label":"Website","url":"#"},{"icon_name":"Mail","label":"Email","url":"#"},{"icon_name":"Users","label":"Community","url":"#"}]',
+  '[{"title":"Emergency Contact","description":"Campus Security: 0731 660 3524"},{"title":"Transportation","description":"Bus Service Available from Indore City"},{"title":"Visitor Information","description":"Prior appointment recommended"}]',
+  'https://www.google.com/maps?q=IIT+Indore+Pod+1C&output=embed'
+)
+ON DUPLICATE KEY UPDATE
+  hero_title = VALUES(hero_title),
+  hero_subtitle = VALUES(hero_subtitle),
+  info_section_title = VALUES(info_section_title),
+  info_section_subtitle = VALUES(info_section_subtitle),
+  contact_info_cards = VALUES(contact_info_cards),
+  form_title = VALUES(form_title),
+  form_submit_message = VALUES(form_submit_message),
+  form_categories = VALUES(form_categories),
+  key_contacts_title = VALUES(key_contacts_title),
+  key_contacts_subtitle = VALUES(key_contacts_subtitle),
+  key_contacts = VALUES(key_contacts),
+  quick_links_title = VALUES(quick_links_title),
+  quick_links_subtitle = VALUES(quick_links_subtitle),
+  quick_links = VALUES(quick_links),
+  stay_connected_title = VALUES(stay_connected_title),
+  stay_connected_subtitle = VALUES(stay_connected_subtitle),
+  stay_connected_links = VALUES(stay_connected_links),
+  footer_cards = VALUES(footer_cards),
+  map_embed_url = VALUES(map_embed_url);
 
 INSERT INTO home_hero_slides (image_url, title, subtitle, cta_text, cta_link, sort_order, is_active)
 VALUES

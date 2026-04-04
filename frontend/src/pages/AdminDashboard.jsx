@@ -24,6 +24,7 @@ import {
   updateHeroSlide,
   updateAcademicsContent,
   updateAboutContent,
+  updateContactContent,
   updateEventsContent,
   updateSpecializationsContent,
   updateHomeContent,
@@ -211,6 +212,61 @@ const defaultEventsContent = {
   past_events: [],
 };
 
+const defaultContactInfoCard = {
+  icon_name: 'MapPin',
+  title: '',
+  details: [],
+};
+
+const defaultKeyContact = {
+  name: '',
+  designation: '',
+  email: '',
+  phone: '',
+  office: '',
+};
+
+const defaultQuickLinkItem = {
+  title: '',
+  description: '',
+  url: '',
+};
+
+const defaultStayConnectedLink = {
+  icon_name: 'Globe',
+  label: '',
+  url: '',
+};
+
+const defaultFooterCard = {
+  title: '',
+  description: '',
+};
+
+const defaultContactContent = {
+  hero_title: '',
+  hero_subtitle: '',
+  info_section_title: '',
+  info_section_subtitle: '',
+  contact_info_cards: [],
+  form_title: '',
+  form_submit_message: '',
+  form_categories: [],
+  key_contacts_title: '',
+  key_contacts_subtitle: '',
+  key_contacts: [],
+  quick_links_title: '',
+  quick_links_subtitle: '',
+  quick_links: [],
+  stay_connected_title: '',
+  stay_connected_subtitle: '',
+  stay_connected_links: [],
+  footer_cards: [],
+  map_embed_url: '',
+};
+
+const contactInfoIconOptions = ['MapPin', 'Phone', 'Mail', 'Clock', 'Building', 'Globe', 'Users'];
+
 const specializationColorOptions = ['blue', 'amber', 'green', 'cyan', 'emerald'];
 const specializationIconOptions = ['Building', 'Microscope', 'Target', 'FlaskConical', 'Award'];
 
@@ -301,6 +357,7 @@ const adminSectionGroups = [
       { key: 'home-content', label: 'Home Content' },
       { key: 'about-content', label: 'About Content' },
       { key: 'academics-content', label: 'Academics Content' },
+      { key: 'contact-content', label: 'Contact Content' },
       { key: 'events-content', label: 'Events Content' },
       { key: 'specializations-content', label: 'Specializations Content' },
     ],
@@ -343,6 +400,10 @@ const sectionDetails = {
   'academics-content': {
     title: 'Academics Content',
     description: 'Programs, curriculum, facilities, and admission section for Academics page.',
+  },
+  'contact-content': {
+    title: 'Contact Content',
+    description: 'Contact page sections, cards, categories, and key contact details.',
   },
   'specializations-content': {
     title: 'Specializations Content',
@@ -432,6 +493,7 @@ const AdminDashboard = () => {
   const [homeContent, setHomeContent] = useState(defaultHomeContent);
   const [aboutContent, setAboutContent] = useState(defaultAboutContent);
   const [academicsContent, setAcademicsContent] = useState(defaultAcademicsContent);
+  const [contactContent, setContactContent] = useState(defaultContactContent);
   const [eventsContent, setEventsContent] = useState(defaultEventsContent);
   const [specializationsContent, setSpecializationsContent] = useState(defaultSpecializationsContent);
   const [navigationItems, setNavigationItems] = useState([]);
@@ -457,6 +519,7 @@ const AdminDashboard = () => {
     const loadedHomeContent = data?.homeContent || {};
     const loadedAboutContent = data?.aboutContent || {};
     const loadedAcademicsContent = data?.academicsContent || {};
+    const loadedContactContent = data?.contactContent || {};
     const loadedEventsContent = data?.eventsContent || {};
     const loadedSpecializationsContent = data?.specializationsContent || {};
 
@@ -509,6 +572,29 @@ const AdminDashboard = () => {
         : [],
       laboratory_rows: Array.isArray(loadedSpecializationsContent.laboratory_rows)
         ? loadedSpecializationsContent.laboratory_rows
+        : [],
+    });
+
+    setContactContent({
+      ...defaultContactContent,
+      ...loadedContactContent,
+      contact_info_cards: Array.isArray(loadedContactContent.contact_info_cards)
+        ? loadedContactContent.contact_info_cards
+        : [],
+      form_categories: Array.isArray(loadedContactContent.form_categories)
+        ? loadedContactContent.form_categories
+        : [],
+      key_contacts: Array.isArray(loadedContactContent.key_contacts)
+        ? loadedContactContent.key_contacts
+        : [],
+      quick_links: Array.isArray(loadedContactContent.quick_links)
+        ? loadedContactContent.quick_links
+        : [],
+      stay_connected_links: Array.isArray(loadedContactContent.stay_connected_links)
+        ? loadedContactContent.stay_connected_links
+        : [],
+      footer_cards: Array.isArray(loadedContactContent.footer_cards)
+        ? loadedContactContent.footer_cards
         : [],
     });
 
@@ -1281,6 +1367,158 @@ const AdminDashboard = () => {
 
   const removeEventsListItem = (field, index) => {
     setEventsContent((previous) => ({
+      ...previous,
+      [field]: (Array.isArray(previous[field]) ? previous[field] : []).filter(
+        (_item, currentIndex) => currentIndex !== index,
+      ),
+    }));
+  };
+
+  const saveContactContent = () => {
+    const contactInfoCards = (Array.isArray(contactContent.contact_info_cards)
+      ? contactContent.contact_info_cards
+      : []
+    )
+      .map((item) => ({
+        icon_name: String(item?.icon_name || 'MapPin').trim(),
+        title: String(item?.title || '').trim(),
+        details: Array.isArray(item?.details)
+          ? item.details.map((detail) => String(detail || '').trim()).filter(Boolean)
+          : [],
+      }))
+      .filter((item) => item.title || item.details.length > 0);
+
+    if (contactInfoCards.some((item) => !item.title || item.details.length === 0)) {
+      setError('Each contact info card needs title and at least one detail line.');
+      return;
+    }
+
+    const formCategories = (Array.isArray(contactContent.form_categories)
+      ? contactContent.form_categories
+      : []
+    )
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+
+    if (formCategories.length === 0) {
+      setError('Please provide at least one form category.');
+      return;
+    }
+
+    const keyContacts = (Array.isArray(contactContent.key_contacts)
+      ? contactContent.key_contacts
+      : []
+    )
+      .map((item) => ({
+        name: String(item?.name || '').trim(),
+        designation: String(item?.designation || '').trim(),
+        email: String(item?.email || '').trim(),
+        phone: String(item?.phone || '').trim(),
+        office: String(item?.office || '').trim(),
+      }))
+      .filter((item) => item.name || item.email || item.phone);
+
+    if (
+      keyContacts.some(
+        (item) =>
+          !item.name || !item.designation || !item.email || !item.phone || !item.office,
+      )
+    ) {
+      setError('Each key contact needs name, designation, email, phone, and office.');
+      return;
+    }
+
+    const quickLinks = (Array.isArray(contactContent.quick_links)
+      ? contactContent.quick_links
+      : []
+    )
+      .map((item) => ({
+        title: String(item?.title || '').trim(),
+        description: String(item?.description || '').trim(),
+        url: String(item?.url || '').trim() || null,
+      }))
+      .filter((item) => item.title || item.description);
+
+    if (quickLinks.some((item) => !item.title || !item.description)) {
+      setError('Each quick link needs title and description.');
+      return;
+    }
+
+    const stayConnectedLinks = (Array.isArray(contactContent.stay_connected_links)
+      ? contactContent.stay_connected_links
+      : []
+    )
+      .map((item) => ({
+        icon_name: String(item?.icon_name || 'Globe').trim(),
+        label: String(item?.label || '').trim(),
+        url: String(item?.url || '').trim() || null,
+      }))
+      .filter((item) => item.label || item.url);
+
+    if (stayConnectedLinks.some((item) => !item.label)) {
+      setError('Each stay connected link needs a label.');
+      return;
+    }
+
+    const footerCards = (Array.isArray(contactContent.footer_cards)
+      ? contactContent.footer_cards
+      : []
+    )
+      .map((item) => ({
+        title: String(item?.title || '').trim(),
+        description: String(item?.description || '').trim(),
+      }))
+      .filter((item) => item.title || item.description);
+
+    if (footerCards.some((item) => !item.title || !item.description)) {
+      setError('Each footer card needs title and description.');
+      return;
+    }
+
+    const payload = {
+      ...contactContent,
+      contact_info_cards: contactInfoCards,
+      form_categories: formCategories,
+      key_contacts: keyContacts,
+      quick_links: quickLinks,
+      stay_connected_links: stayConnectedLinks,
+      footer_cards: footerCards,
+      map_embed_url: String(contactContent.map_embed_url || '').trim(),
+    };
+
+    if (!payload.map_embed_url) {
+      setError('Map embed URL is required.');
+      return;
+    }
+
+    delete payload.id;
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    runAction(
+      () => updateContactContent(payload),
+      'Contact content updated successfully.',
+    );
+  };
+
+  const addContactListItem = (field, itemTemplate) => {
+    setContactContent((previous) => ({
+      ...previous,
+      [field]: [...(Array.isArray(previous[field]) ? previous[field] : []), { ...itemTemplate }],
+    }));
+  };
+
+  const updateContactListItem = (field, index, nextItem) => {
+    setContactContent((previous) => ({
+      ...previous,
+      [field]: (Array.isArray(previous[field]) ? previous[field] : []).map((item, currentIndex) =>
+        currentIndex === index ? { ...item, ...nextItem } : item,
+      ),
+    }));
+  };
+
+  const removeContactListItem = (field, index) => {
+    setContactContent((previous) => ({
       ...previous,
       [field]: (Array.isArray(previous[field]) ? previous[field] : []).filter(
         (_item, currentIndex) => currentIndex !== index,
@@ -3154,6 +3392,529 @@ const AdminDashboard = () => {
                   className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
                 >
                   Save Academics Content
+                </button>
+              </section>
+            )}
+
+            {activeSection === 'contact-content' && (
+              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900">Contact Content</h2>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={contactContent.hero_title}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          hero_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={contactContent.hero_subtitle}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          hero_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Info Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={contactContent.info_section_title}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          info_section_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Info Section Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={contactContent.info_section_subtitle}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          info_section_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Contact Info Cards</h3>
+                      <button
+                        type="button"
+                        onClick={() => addContactListItem('contact_info_cards', defaultContactInfoCard)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Card
+                      </button>
+                    </div>
+
+                    {(Array.isArray(contactContent.contact_info_cards)
+                      ? contactContent.contact_info_cards
+                      : []
+                    ).map((item, index) => (
+                      <div key={`contact-card-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
+                        <select
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
+                          value={item.icon_name || 'MapPin'}
+                          onChange={(event) =>
+                            updateContactListItem('contact_info_cards', index, {
+                              icon_name: event.target.value,
+                            })
+                          }
+                        >
+                          {contactInfoIconOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-7"
+                          placeholder="Card Title"
+                          value={item.title || ''}
+                          onChange={(event) =>
+                            updateContactListItem('contact_info_cards', index, {
+                              title: event.target.value,
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeContactListItem('contact_info_cards', index)}
+                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
+                        >
+                          Remove
+                        </button>
+
+                        <textarea
+                          className="rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm md:col-span-12"
+                          placeholder="Details (one per line)"
+                          value={formatMultilineList(item.details)}
+                          onChange={(event) =>
+                            updateContactListItem('contact_info_cards', index, {
+                              details: parseMultilineList(event.target.value),
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Form Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={contactContent.form_title}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          form_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Form Submit Message
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={contactContent.form_submit_message}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          form_submit_message: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Form Categories (one per line)
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
+                      value={formatMultilineList(contactContent.form_categories)}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          form_categories: parseMultilineList(event.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Key Contacts Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={contactContent.key_contacts_title}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          key_contacts_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Key Contacts Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={contactContent.key_contacts_subtitle}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          key_contacts_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Key Contacts</h3>
+                      <button
+                        type="button"
+                        onClick={() => addContactListItem('key_contacts', defaultKeyContact)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Contact
+                      </button>
+                    </div>
+
+                    {(Array.isArray(contactContent.key_contacts) ? contactContent.key_contacts : []).map(
+                      (item, index) => (
+                        <div key={`key-contact-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                            placeholder="Name"
+                            value={item.name || ''}
+                            onChange={(event) =>
+                              updateContactListItem('key_contacts', index, {
+                                name: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                            placeholder="Designation"
+                            value={item.designation || ''}
+                            onChange={(event) =>
+                              updateContactListItem('key_contacts', index, {
+                                designation: event.target.value,
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeContactListItem('key_contacts', index)}
+                            className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-4"
+                          >
+                            Remove
+                          </button>
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                            placeholder="Email"
+                            value={item.email || ''}
+                            onChange={(event) =>
+                              updateContactListItem('key_contacts', index, {
+                                email: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                            placeholder="Phone"
+                            value={item.phone || ''}
+                            onChange={(event) =>
+                              updateContactListItem('key_contacts', index, {
+                                phone: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                            placeholder="Office"
+                            value={item.office || ''}
+                            onChange={(event) =>
+                              updateContactListItem('key_contacts', index, {
+                                office: event.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      ),
+                    )}
+                  </div>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Quick Links Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={contactContent.quick_links_title}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          quick_links_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Quick Links Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={contactContent.quick_links_subtitle}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          quick_links_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Quick Links</h3>
+                      <button
+                        type="button"
+                        onClick={() => addContactListItem('quick_links', defaultQuickLinkItem)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Quick Link
+                      </button>
+                    </div>
+
+                    {(Array.isArray(contactContent.quick_links) ? contactContent.quick_links : []).map(
+                      (item, index) => (
+                        <div key={`quick-link-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                            placeholder="Title"
+                            value={item.title || ''}
+                            onChange={(event) =>
+                              updateContactListItem('quick_links', index, {
+                                title: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-6"
+                            placeholder="Description"
+                            value={item.description || ''}
+                            onChange={(event) =>
+                              updateContactListItem('quick_links', index, {
+                                description: event.target.value,
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeContactListItem('quick_links', index)}
+                            className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
+                          >
+                            Remove
+                          </button>
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-12"
+                            placeholder="URL (optional)"
+                            value={item.url || ''}
+                            onChange={(event) =>
+                              updateContactListItem('quick_links', index, {
+                                url: event.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      ),
+                    )}
+                  </div>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Stay Connected Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={contactContent.stay_connected_title}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          stay_connected_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Stay Connected Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={contactContent.stay_connected_subtitle}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          stay_connected_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Stay Connected Links</h3>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          addContactListItem('stay_connected_links', defaultStayConnectedLink)
+                        }
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Link
+                      </button>
+                    </div>
+
+                    {(Array.isArray(contactContent.stay_connected_links)
+                      ? contactContent.stay_connected_links
+                      : []
+                    ).map((item, index) => (
+                      <div key={`stay-link-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
+                        <select
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
+                          value={item.icon_name || 'Globe'}
+                          onChange={(event) =>
+                            updateContactListItem('stay_connected_links', index, {
+                              icon_name: event.target.value,
+                            })
+                          }
+                        >
+                          {contactInfoIconOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                          placeholder="Label"
+                          value={item.label || ''}
+                          onChange={(event) =>
+                            updateContactListItem('stay_connected_links', index, {
+                              label: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                          placeholder="URL"
+                          value={item.url || ''}
+                          onChange={(event) =>
+                            updateContactListItem('stay_connected_links', index, {
+                              url: event.target.value,
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeContactListItem('stay_connected_links', index)}
+                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-1"
+                        >
+                          X
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Bottom Info Cards</h3>
+                      <button
+                        type="button"
+                        onClick={() => addContactListItem('footer_cards', defaultFooterCard)}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Card
+                      </button>
+                    </div>
+
+                    {(Array.isArray(contactContent.footer_cards) ? contactContent.footer_cards : []).map(
+                      (item, index) => (
+                        <div key={`contact-footer-card-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                            placeholder="Title"
+                            value={item.title || ''}
+                            onChange={(event) =>
+                              updateContactListItem('footer_cards', index, {
+                                title: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-6"
+                            placeholder="Description"
+                            value={item.description || ''}
+                            onChange={(event) =>
+                              updateContactListItem('footer_cards', index, {
+                                description: event.target.value,
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeContactListItem('footer_cards', index)}
+                            className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ),
+                    )}
+                  </div>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Map Embed URL
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={contactContent.map_embed_url}
+                      onChange={(event) =>
+                        setContactContent((previous) => ({
+                          ...previous,
+                          map_embed_url: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveContactContent}
+                  disabled={isWorking}
+                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
+                >
+                  Save Contact Content
                 </button>
               </section>
             )}

@@ -149,6 +149,31 @@ CREATE TABLE IF NOT EXISTS events_content (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS contact_content (
+  id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+  hero_title VARCHAR(255) NOT NULL,
+  hero_subtitle TEXT NOT NULL,
+  info_section_title VARCHAR(255) NOT NULL,
+  info_section_subtitle TEXT NOT NULL,
+  contact_info_cards JSON NOT NULL,
+  form_title VARCHAR(255) NOT NULL,
+  form_submit_message VARCHAR(255) NOT NULL,
+  form_categories JSON NOT NULL,
+  key_contacts_title VARCHAR(255) NOT NULL,
+  key_contacts_subtitle TEXT NOT NULL,
+  key_contacts JSON NOT NULL,
+  quick_links_title VARCHAR(255) NOT NULL,
+  quick_links_subtitle TEXT NOT NULL,
+  quick_links JSON NOT NULL,
+  stay_connected_title VARCHAR(255) NOT NULL,
+  stay_connected_subtitle TEXT NOT NULL,
+  stay_connected_links JSON NOT NULL,
+  footer_cards JSON NOT NULL,
+  map_embed_url TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS home_hero_slides (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   image_url VARCHAR(512) NOT NULL,

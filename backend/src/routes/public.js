@@ -193,6 +193,36 @@ router.get("/events", async (_req, res) => {
   }
 });
 
+router.get("/contact", async (_req, res) => {
+  try {
+    const [contactContent] = await query(
+      "SELECT * FROM contact_content WHERE id = 1 LIMIT 1"
+    );
+
+    if (!contactContent) {
+      return res.json({ contactContent: null });
+    }
+
+    return res.json({
+      contactContent: {
+        ...contactContent,
+        contact_info_cards: parseMaybeJson(contactContent.contact_info_cards) || [],
+        form_categories: parseMaybeJson(contactContent.form_categories) || [],
+        key_contacts: parseMaybeJson(contactContent.key_contacts) || [],
+        quick_links: parseMaybeJson(contactContent.quick_links) || [],
+        stay_connected_links:
+          parseMaybeJson(contactContent.stay_connected_links) || [],
+        footer_cards: parseMaybeJson(contactContent.footer_cards) || [],
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch contact content",
+      message: error.message,
+    });
+  }
+});
+
 router.get("/people", async (_req, res) => {
   try {
     const entries = await query(

@@ -205,6 +205,59 @@ const eventsContentPatchSchema = nonEmptyPatch({
   past_events: z.array(eventsItemSchema),
 });
 
+const contactInfoCardSchema = z.object({
+  icon_name: z.string().min(1),
+  title: z.string().min(1),
+  details: z.array(z.string()),
+});
+
+const keyContactSchema = z.object({
+  name: z.string().min(1),
+  designation: z.string().min(1),
+  email: z.string().min(1),
+  phone: z.string().min(1),
+  office: z.string().min(1),
+});
+
+const quickLinkSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+  url: z.string().nullable().optional(),
+});
+
+const stayConnectedLinkSchema = z.object({
+  icon_name: z.string().min(1),
+  label: z.string().min(1),
+  url: z.string().nullable().optional(),
+});
+
+const footerCardSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+});
+
+const contactContentPatchSchema = nonEmptyPatch({
+  hero_title: z.string().min(1),
+  hero_subtitle: z.string().min(1),
+  info_section_title: z.string().min(1),
+  info_section_subtitle: z.string().min(1),
+  contact_info_cards: z.array(contactInfoCardSchema),
+  form_title: z.string().min(1),
+  form_submit_message: z.string().min(1),
+  form_categories: z.array(z.string()),
+  key_contacts_title: z.string().min(1),
+  key_contacts_subtitle: z.string().min(1),
+  key_contacts: z.array(keyContactSchema),
+  quick_links_title: z.string().min(1),
+  quick_links_subtitle: z.string().min(1),
+  quick_links: z.array(quickLinkSchema),
+  stay_connected_title: z.string().min(1),
+  stay_connected_subtitle: z.string().min(1),
+  stay_connected_links: z.array(stayConnectedLinkSchema),
+  footer_cards: z.array(footerCardSchema),
+  map_embed_url: z.string().min(1),
+});
+
 const navigationItemCreateSchema = z.object({
   label: z.string().min(1),
   href: z.string().min(1),
@@ -533,6 +586,54 @@ function normalizeEventsPayload(payload) {
   return nextPayload;
 }
 
+function serializeContactContent(contactContent) {
+  if (!contactContent) {
+    return null;
+  }
+
+  return {
+    ...contactContent,
+    contact_info_cards: parseMaybeJson(contactContent.contact_info_cards) || [],
+    form_categories: parseMaybeJson(contactContent.form_categories) || [],
+    key_contacts: parseMaybeJson(contactContent.key_contacts) || [],
+    quick_links: parseMaybeJson(contactContent.quick_links) || [],
+    stay_connected_links: parseMaybeJson(contactContent.stay_connected_links) || [],
+    footer_cards: parseMaybeJson(contactContent.footer_cards) || [],
+  };
+}
+
+function normalizeContactPayload(payload) {
+  const nextPayload = { ...payload };
+
+  if (nextPayload.contact_info_cards !== undefined) {
+    nextPayload.contact_info_cards = JSON.stringify(nextPayload.contact_info_cards || []);
+  }
+
+  if (nextPayload.form_categories !== undefined) {
+    nextPayload.form_categories = JSON.stringify(nextPayload.form_categories || []);
+  }
+
+  if (nextPayload.key_contacts !== undefined) {
+    nextPayload.key_contacts = JSON.stringify(nextPayload.key_contacts || []);
+  }
+
+  if (nextPayload.quick_links !== undefined) {
+    nextPayload.quick_links = JSON.stringify(nextPayload.quick_links || []);
+  }
+
+  if (nextPayload.stay_connected_links !== undefined) {
+    nextPayload.stay_connected_links = JSON.stringify(
+      nextPayload.stay_connected_links || []
+    );
+  }
+
+  if (nextPayload.footer_cards !== undefined) {
+    nextPayload.footer_cards = JSON.stringify(nextPayload.footer_cards || []);
+  }
+
+  return nextPayload;
+}
+
 function sanitizeUploadCategory(rawCategory) {
   const normalized = String(rawCategory || "general")
     .toLowerCase()
@@ -724,6 +825,10 @@ router.get("/content", async (_req, res) => {
       "SELECT * FROM events_content WHERE id = 1 LIMIT 1"
     );
 
+    const [contactContent] = await query(
+      "SELECT * FROM contact_content WHERE id = 1 LIMIT 1"
+    );
+
     const navigation = await query(
       "SELECT id, label, href, sort_order, is_active FROM navigation_items ORDER BY sort_order ASC, id ASC"
     );
@@ -764,6 +869,7 @@ router.get("/content", async (_req, res) => {
       academicsContent: serializeAcademicsContent(academicsContent),
       specializationsContent: serializeSpecializationsContent(specializationsContent),
       eventsContent: serializeEventsContent(eventsContent),
+      contactContent: serializeContactContent(contactContent),
       navigation,
       socialLinks,
       footerLinks,
@@ -1314,6 +1420,134 @@ router.put("/events-content", async (req, res) => {
           insertPayload.no_past_message,
           insertPayload.upcoming_events,
           insertPayload.past_events,
+        ]
+      );
+    }
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/contact-content", async (req, res) => {
+  const parsed = contactContentPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const allowedFields = [
+    "hero_title",
+    "hero_subtitle",
+    "info_section_title",
+    "info_section_subtitle",
+    "contact_info_cards",
+    "form_title",
+    "form_submit_message",
+    "form_categories",
+    "key_contacts_title",
+    "key_contacts_subtitle",
+    "key_contacts",
+    "quick_links_title",
+    "quick_links_subtitle",
+    "quick_links",
+    "stay_connected_title",
+    "stay_connected_subtitle",
+    "stay_connected_links",
+    "footer_cards",
+    "map_embed_url",
+  ];
+
+  try {
+    const payload = normalizeContactPayload(parsed.data);
+    const update = buildUpdateClause(payload, allowedFields);
+    if (!update) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    const [existingRow] = await query(
+      "SELECT id FROM contact_content WHERE id = 1 LIMIT 1"
+    );
+
+    if (existingRow) {
+      await query(
+        `UPDATE contact_content SET ${update.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
+        update.values
+      );
+    } else {
+      const insertPayload = {
+        hero_title: "Contact Us",
+        hero_subtitle:
+          "Get in touch with us for admissions, research opportunities, collaborations, or any other inquiries",
+        info_section_title: "Get in Touch",
+        info_section_subtitle:
+          "We are here to help and answer any questions you might have",
+        contact_info_cards: "[]",
+        form_title: "Send us a Message",
+        form_submit_message:
+          "Thank you for your message! We will get back to you soon.",
+        form_categories: "[]",
+        key_contacts_title: "Key Contacts",
+        key_contacts_subtitle:
+          "Direct contacts for specific departments and services",
+        key_contacts: "[]",
+        quick_links_title: "Quick Links",
+        quick_links_subtitle: "Find specific information quickly",
+        quick_links: "[]",
+        stay_connected_title: "Stay Connected",
+        stay_connected_subtitle:
+          "Follow us on social media for the latest updates, news, and events",
+        stay_connected_links: "[]",
+        footer_cards: "[]",
+        map_embed_url:
+          "https://www.google.com/maps?q=IIT+Indore+Pod+1C&output=embed",
+        ...payload,
+      };
+
+      await query(
+        `INSERT INTO contact_content (
+          id,
+          hero_title,
+          hero_subtitle,
+          info_section_title,
+          info_section_subtitle,
+          contact_info_cards,
+          form_title,
+          form_submit_message,
+          form_categories,
+          key_contacts_title,
+          key_contacts_subtitle,
+          key_contacts,
+          quick_links_title,
+          quick_links_subtitle,
+          quick_links,
+          stay_connected_title,
+          stay_connected_subtitle,
+          stay_connected_links,
+          footer_cards,
+          map_embed_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          1,
+          insertPayload.hero_title,
+          insertPayload.hero_subtitle,
+          insertPayload.info_section_title,
+          insertPayload.info_section_subtitle,
+          insertPayload.contact_info_cards,
+          insertPayload.form_title,
+          insertPayload.form_submit_message,
+          insertPayload.form_categories,
+          insertPayload.key_contacts_title,
+          insertPayload.key_contacts_subtitle,
+          insertPayload.key_contacts,
+          insertPayload.quick_links_title,
+          insertPayload.quick_links_subtitle,
+          insertPayload.quick_links,
+          insertPayload.stay_connected_title,
+          insertPayload.stay_connected_subtitle,
+          insertPayload.stay_connected_links,
+          insertPayload.footer_cards,
+          insertPayload.map_embed_url,
         ]
       );
     }
