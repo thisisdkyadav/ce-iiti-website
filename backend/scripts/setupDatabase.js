@@ -44,6 +44,54 @@ async function hasExistingSeedData(connection) {
   return Number(dataRows?.[0]?.total || 0) > 0;
 }
 
+function extractInsertStatement(seedSql, tableName) {
+  const statementPattern = new RegExp(
+    `INSERT INTO\\s+${tableName}\\s*\\([\\s\\S]*?;`,
+    "i",
+  );
+  const match = seedSql.match(statementPattern);
+  return match ? match[0] : null;
+}
+
+async function hasSingletonRow(connection, tableName) {
+  const [rows] = await connection.query(
+    `SELECT COUNT(*) AS total FROM \`${databaseName}\`.\`${tableName}\` WHERE id = 1`,
+  );
+
+  return Number(rows?.[0]?.total || 0) > 0;
+}
+
+async function seedMissingSingletonRows(connection) {
+  const singletonTables = [
+    "specializations_content",
+    "events_content",
+    "contact_content",
+  ];
+  const seedSql = fs.readFileSync(seedSqlPath, "utf8");
+  const backfilledTables = [];
+
+  for (const tableName of singletonTables) {
+    const alreadyExists = await hasSingletonRow(connection, tableName);
+
+    if (alreadyExists) {
+      continue;
+    }
+
+    const insertStatement = extractInsertStatement(seedSql, tableName);
+
+    if (!insertStatement) {
+      throw new Error(
+        `Could not find seed INSERT statement for table: ${tableName}`,
+      );
+    }
+
+    await connection.query(`USE \`${databaseName}\`; ${insertStatement}`);
+    backfilledTables.push(tableName);
+  }
+
+  return backfilledTables;
+}
+
 async function main() {
   const args = new Set(process.argv.slice(2));
   const runSchemaOnly = args.has("--schema");
@@ -68,6 +116,18 @@ async function main() {
         console.log(
           "Seed skipped to preserve existing data. Use --force-seed to overwrite with defaults.",
         );
+
+        const backfilledTables = await seedMissingSingletonRows(connection);
+
+        if (backfilledTables.length > 0) {
+          // eslint-disable-next-line no-console
+          console.log(
+            `Backfilled missing singleton defaults for: ${backfilledTables.join(", ")}.`,
+          );
+        } else {
+          // eslint-disable-next-line no-console
+          console.log("No missing singleton content rows required backfill.");
+        }
       } else {
         await runSqlFile(connection, seedSqlPath);
         // eslint-disable-next-line no-console
