@@ -4,6 +4,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE admin_sessions;
 TRUNCATE TABLE news_items;
 TRUNCATE TABLE people_entries;
+TRUNCATE TABLE academics_content;
 TRUNCATE TABLE about_content;
 TRUNCATE TABLE home_stats;
 TRUNCATE TABLE home_hero_slides;
@@ -194,6 +195,65 @@ ON DUPLICATE KEY UPDATE
   stats_title = VALUES(stats_title),
   stats_subtitle = VALUES(stats_subtitle),
   stats_items = VALUES(stats_items);
+
+INSERT INTO academics_content (
+  id,
+  hero_title,
+  hero_subtitle,
+  programs_title,
+  programs_subtitle,
+  programs,
+  curriculum_title,
+  curriculum_subtitle,
+  curriculum_semesters,
+  facilities_title,
+  facilities_subtitle,
+  facilities_items,
+  admission_title,
+  admission_subtitle,
+  admission_primary_text,
+  admission_primary_link,
+  admission_secondary_text,
+  admission_secondary_link
+)
+VALUES (
+  1,
+  'Academic Programs',
+  'Comprehensive education programs designed to shape the next generation of civil engineers',
+  'Our Programs',
+  'From undergraduate to doctoral levels, we offer comprehensive programs that combine theoretical knowledge with practical application',
+  '[{"title":"B.Tech in Civil Engineering","link_url":"https://academic.iiti.ac.in/app/storage/app/coursecurriculum/9NVdg9JRdMxVbWQmnp0vHGM10r2lwjBN8Oy4aSP6.pdf","link_target":"_blank","duration":"4 Years","intake":"Intake: 53","description":"Comprehensive undergraduate program covering all major areas of civil engineering with strong emphasis on practical learning and industry exposure.","highlights":["Strong foundation in mathematics, physics, and engineering sciences","Hands-on laboratory experience in all core subjects","Industry internships and live projects","Professional development and communication skills"],"courses":["Engineering Mechanics","Structural Analysis","RCC and Steel Design","Geotechnical Engineering","Transportation Systems Engineering","Water Resources Engineering"]},{"title":"M.Tech in Structural Engineering","link_url":"https://academic.iiti.ac.in/app/storage/app/coursecurriculum/7xAINJWsbYbISP5Lk9PSY2VJU5daoGrnm2lbjilf.pdf","link_target":"_blank","duration":"2 Years","intake":"Intake: 10 (TA Category)","description":"Advanced program focusing on design, analysis, and behavior of structures with emphasis on modern computational methods and sustainable construction.","highlights":["Advanced structural analysis and design","Research-oriented curriculum","Access to state-of-the-art laboratories","Thesis work with industry collaboration"],"courses":["Advanced Structural Analysis","Earthquake Engineering","Bridge Engineering","High-rise Building Design","Finite Element Methods","Steel and Concrete Structures"]},{"title":"M.Tech in Water, Climate & Sustainability","link_url":"https://academic.iiti.ac.in/app/storage/app/coursecurriculum/7xAINJWsbYbISP5Lk9PSY2VJU5daoGrnm2lbjilf.pdf","link_target":"_blank","duration":"2 Years","intake":"Intake: 10 (TA Category)","description":"Interdisciplinary program focusing on water resources, climate resilience, and sustainable environmental systems to address emerging global challenges.","highlights":["Advanced hydrology and climate modelling","Sustainable water resource management","Hands-on training with environmental simulation tools","Research and field-based projects in climate resilience"],"courses":["Advanced Hydrology","Water Resources Systems Engineering","Climate Change Impact Assessment","Environmental Data Analytics","Sustainable Water Infrastructure","Hydraulic Modelling & Simulation"]},{"title":"M.Tech in Transportation Systems Engineering (Upcoming)","link_url":"/programs/mtech-transportation-systems-engineering.html","link_target":"_blank","duration":"2 Years","intake":"Intake: 10 (TA Category)","description":"Program dedicated to planning, design, and optimization of modern transportation networks with a focus on smart mobility and sustainable infrastructure.","highlights":["Advanced traffic engineering and transport planning","Exposure to intelligent transportation systems (ITS)","Laboratory and software training in transport simulation","Industry-linked projects on mobility and infrastructure"],"courses":["Traffic Engineering & Management","Transportation Planning","Pavement Design & Materials","Public Transport Systems","Intelligent Transportation Systems (ITS)","Transport Modelling & Simulation"]},{"title":"M.Tech in Geotechnical Engineering (Upcoming)","link_url":null,"link_target":"_blank","duration":"2 Years","intake":"Intake: 10 (TA Category)","description":"Specialized program in soil mechanics, foundation engineering, and geoenvironmental engineering with modern testing and analysis techniques.","highlights":["Comprehensive soil and rock mechanics","Foundation design for complex structures","Geoenvironmental engineering applications","Field investigation techniques"],"courses":["Advanced Soil Mechanics","Foundation Engineering","Slope Stability","Ground Improvement","Rock Mechanics","Geosynthetics"]},{"title":"Ph.D. in Civil Engineering","link_url":"https://academic.iiti.ac.in/app/storage/app/coursecurriculum/7xAINJWsbYbISP5Lk9PSY2VJU5daoGrnm2lbjilf.pdf","link_target":"_blank","duration":"3-6 Years","intake":null,"description":"Research-intensive doctoral program aimed at producing independent researchers and academics in various specializations of civil engineering.","highlights":["Independent research under expert supervision","Interdisciplinary research opportunities","Teaching assistantship opportunities","International collaboration programs"],"courses":["Research Methodology","Advanced Mathematics","Specialized Courses","Dissertation Research","Seminar Presentations","Professional Development"]}]',
+  'B.Tech Curriculum Structure',
+  'Detailed semester-wise breakdown of the undergraduate program',
+  '[{"semester_label":"Semester 1","courses":["Basic Electrical Engineering","Engineering Mechanics","Basics of Physics","Physics Lab- I","Calculus","Language and Composition","Makerspace","Computer Programming","Computer Programming Lab"]},{"semester_label":"Semester 2","courses":["Biosciences","Linear Algebra","Differential Equations-I","Environmental Studies","Fundamentals of Economics","Chemistry","Chemistry Lab","Flexible Elective","Flexible Elective (HSS)"]},{"semester_label":"Semester 3","courses":["Complex Analysis","Differential Equations-II","Strength of Materials","Fluid Mechanics","Surveying","Building Materials","Surveying","Department Elective I"]},{"semester_label":"Semester 4","courses":["Numerical Methods","Structural Analysis-I","Soil Mechanics-I","Engineering Geology","Environmental Engineering","Department Elective II","Institute Elective I"]},{"semester_label":"Semester 5","courses":["Structural Analysis-II","Soil Mechanics-II","Transportation Engineering","Design of Reinforced Concrete Structures","Department Elective III","Institute Elective II"]},{"semester_label":"Semester 6","courses":["Design of steel structures","Engineering Hydrology","Computer Aided Design Lab","Introduction to Finite Element Methods","Department Elective IV","Department Elective IV","Institute Elective III"]},{"semester_label":"Semester 7","courses":["B Tech Project (BTP)","Internship"]},{"semester_label":"Semester 8","courses":["Water Resources Engineering","Design of Structures-III","Transportation Engineering-II","Foundation Engineering","Department Elective V","Institute Elective IV","Institute Elective V"]}]',
+  'Laboratory Facilities',
+  'State-of-the-art laboratories supporting hands-on learning and research',
+  '["Computational Laboratory","Engineering Geology Laboratory","Environmental Engineering Laboratory","Fluid Mechanics Laboratory","Geotechnical Engineering Laboratory- 01","Geotechnical Engineering Laboratory- 02","Geodesy & Surveying Laboratory","Hydraulics and Hydrology Laboratory","Materials Engineering Laboratory","Solid Mechanics Laboratory","Transportation Engineering Laboratory","Structure Engineering Laboratory"]',
+  'Ready to Join Us?',
+  'Take the first step towards a rewarding career in civil engineering. Learn about our admission process and requirements.',
+  'Admission Guidelines',
+  '/contact',
+  'Download Brochure',
+  '#'
+)
+ON DUPLICATE KEY UPDATE
+  hero_title = VALUES(hero_title),
+  hero_subtitle = VALUES(hero_subtitle),
+  programs_title = VALUES(programs_title),
+  programs_subtitle = VALUES(programs_subtitle),
+  programs = VALUES(programs),
+  curriculum_title = VALUES(curriculum_title),
+  curriculum_subtitle = VALUES(curriculum_subtitle),
+  curriculum_semesters = VALUES(curriculum_semesters),
+  facilities_title = VALUES(facilities_title),
+  facilities_subtitle = VALUES(facilities_subtitle),
+  facilities_items = VALUES(facilities_items),
+  admission_title = VALUES(admission_title),
+  admission_subtitle = VALUES(admission_subtitle),
+  admission_primary_text = VALUES(admission_primary_text),
+  admission_primary_link = VALUES(admission_primary_link),
+  admission_secondary_text = VALUES(admission_secondary_text),
+  admission_secondary_link = VALUES(admission_secondary_link);
 
 INSERT INTO home_hero_slides (image_url, title, subtitle, cta_text, cta_link, sort_order, is_active)
 VALUES

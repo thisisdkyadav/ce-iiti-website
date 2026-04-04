@@ -101,6 +101,42 @@ const aboutContentPatchSchema = nonEmptyPatch({
   stats_items: z.array(aboutStatItemSchema),
 });
 
+const academicsProgramSchema = z.object({
+  title: z.string().min(1),
+  link_url: z.string().nullable().optional(),
+  link_target: z.string().optional(),
+  duration: z.string().min(1),
+  intake: z.string().nullable().optional(),
+  description: z.string().min(1),
+  highlights: z.array(z.string()),
+  courses: z.array(z.string()),
+});
+
+const academicsSemesterSchema = z.object({
+  semester_label: z.string().min(1),
+  courses: z.array(z.string()),
+});
+
+const academicsContentPatchSchema = nonEmptyPatch({
+  hero_title: z.string().min(1),
+  hero_subtitle: z.string().min(1),
+  programs_title: z.string().min(1),
+  programs_subtitle: z.string().min(1),
+  programs: z.array(academicsProgramSchema),
+  curriculum_title: z.string().min(1),
+  curriculum_subtitle: z.string().min(1),
+  curriculum_semesters: z.array(academicsSemesterSchema),
+  facilities_title: z.string().min(1),
+  facilities_subtitle: z.string().min(1),
+  facilities_items: z.array(z.string()),
+  admission_title: z.string().min(1),
+  admission_subtitle: z.string().min(1),
+  admission_primary_text: z.string().min(1),
+  admission_primary_link: z.string().min(1),
+  admission_secondary_text: z.string().min(1),
+  admission_secondary_link: z.string().min(1),
+});
+
 const navigationItemCreateSchema = z.object({
   label: z.string().min(1),
   href: z.string().min(1),
@@ -344,6 +380,39 @@ function normalizeAboutPayload(payload) {
   return nextPayload;
 }
 
+function serializeAcademicsContent(academicsContent) {
+  if (!academicsContent) {
+    return null;
+  }
+
+  return {
+    ...academicsContent,
+    programs: parseMaybeJson(academicsContent.programs) || [],
+    curriculum_semesters: parseMaybeJson(academicsContent.curriculum_semesters) || [],
+    facilities_items: parseMaybeJson(academicsContent.facilities_items) || [],
+  };
+}
+
+function normalizeAcademicsPayload(payload) {
+  const nextPayload = { ...payload };
+
+  if (nextPayload.programs !== undefined) {
+    nextPayload.programs = JSON.stringify(nextPayload.programs || []);
+  }
+
+  if (nextPayload.curriculum_semesters !== undefined) {
+    nextPayload.curriculum_semesters = JSON.stringify(
+      nextPayload.curriculum_semesters || []
+    );
+  }
+
+  if (nextPayload.facilities_items !== undefined) {
+    nextPayload.facilities_items = JSON.stringify(nextPayload.facilities_items || []);
+  }
+
+  return nextPayload;
+}
+
 function sanitizeUploadCategory(rawCategory) {
   const normalized = String(rawCategory || "general")
     .toLowerCase()
@@ -523,6 +592,10 @@ router.get("/content", async (_req, res) => {
       "SELECT * FROM about_content WHERE id = 1 LIMIT 1"
     );
 
+    const [academicsContent] = await query(
+      "SELECT * FROM academics_content WHERE id = 1 LIMIT 1"
+    );
+
     const navigation = await query(
       "SELECT id, label, href, sort_order, is_active FROM navigation_items ORDER BY sort_order ASC, id ASC"
     );
@@ -560,6 +633,7 @@ router.get("/content", async (_req, res) => {
         : null,
       homeContent: homeContent || null,
       aboutContent: serializeAboutContent(aboutContent),
+      academicsContent: serializeAcademicsContent(academicsContent),
       navigation,
       socialLinks,
       footerLinks,
@@ -892,6 +966,50 @@ router.put("/about-content", async (req, res) => {
 
     await query(
       `UPDATE about_content SET ${update.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
+      update.values
+    );
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/academics-content", async (req, res) => {
+  const parsed = academicsContentPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const allowedFields = [
+    "hero_title",
+    "hero_subtitle",
+    "programs_title",
+    "programs_subtitle",
+    "programs",
+    "curriculum_title",
+    "curriculum_subtitle",
+    "curriculum_semesters",
+    "facilities_title",
+    "facilities_subtitle",
+    "facilities_items",
+    "admission_title",
+    "admission_subtitle",
+    "admission_primary_text",
+    "admission_primary_link",
+    "admission_secondary_text",
+    "admission_secondary_link",
+  ];
+
+  try {
+    const payload = normalizeAcademicsPayload(parsed.data);
+    const update = buildUpdateClause(payload, allowedFields);
+    if (!update) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    await query(
+      `UPDATE academics_content SET ${update.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
       update.values
     );
 

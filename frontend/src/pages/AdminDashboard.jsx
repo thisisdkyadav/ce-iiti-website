@@ -22,6 +22,7 @@ import {
   updatePeopleEntry,
   updateFooterLink,
   updateHeroSlide,
+  updateAcademicsContent,
   updateAboutContent,
   updateHomeContent,
   updateHomeStat,
@@ -103,6 +104,42 @@ const defaultAboutStatItem = {
 };
 
 const aboutValueIconOptions = ['Award', 'Users', 'Target', 'BookOpen'];
+
+const defaultAcademicsProgram = {
+  title: '',
+  link_url: '',
+  link_target: '_blank',
+  duration: '',
+  intake: '',
+  description: '',
+  highlights: [],
+  courses: [],
+};
+
+const defaultAcademicsSemester = {
+  semester_label: '',
+  courses: [],
+};
+
+const defaultAcademicsContent = {
+  hero_title: '',
+  hero_subtitle: '',
+  programs_title: '',
+  programs_subtitle: '',
+  programs: [],
+  curriculum_title: '',
+  curriculum_subtitle: '',
+  curriculum_semesters: [],
+  facilities_title: '',
+  facilities_subtitle: '',
+  facilities_items: [],
+  admission_title: '',
+  admission_subtitle: '',
+  admission_primary_text: '',
+  admission_primary_link: '',
+  admission_secondary_text: '',
+  admission_secondary_link: '',
+};
 
 const defaultNavigationItem = {
   label: '',
@@ -190,6 +227,7 @@ const adminSectionGroups = [
       { key: 'site-settings', label: 'Site Settings' },
       { key: 'home-content', label: 'Home Content' },
       { key: 'about-content', label: 'About Content' },
+      { key: 'academics-content', label: 'Academics Content' },
     ],
   },
   {
@@ -226,6 +264,10 @@ const sectionDetails = {
   'about-content': {
     title: 'About Content',
     description: 'Hero, story, mission/vision, values, milestones, and stats for About page.',
+  },
+  'academics-content': {
+    title: 'Academics Content',
+    description: 'Programs, curriculum, facilities, and admission section for Academics page.',
   },
   navigation: {
     title: 'Navigation Items',
@@ -306,6 +348,7 @@ const AdminDashboard = () => {
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const [homeContent, setHomeContent] = useState(defaultHomeContent);
   const [aboutContent, setAboutContent] = useState(defaultAboutContent);
+  const [academicsContent, setAcademicsContent] = useState(defaultAcademicsContent);
   const [navigationItems, setNavigationItems] = useState([]);
   const [socialLinks, setSocialLinks] = useState([]);
   const [footerLinks, setFooterLinks] = useState([]);
@@ -328,6 +371,7 @@ const AdminDashboard = () => {
     const loadedSiteSettings = data?.siteSettings || {};
     const loadedHomeContent = data?.homeContent || {};
     const loadedAboutContent = data?.aboutContent || {};
+    const loadedAcademicsContent = data?.academicsContent || {};
 
     setSiteSettings({
       ...defaultSiteSettings,
@@ -353,6 +397,20 @@ const AdminDashboard = () => {
         : [],
       stats_items: Array.isArray(loadedAboutContent.stats_items)
         ? loadedAboutContent.stats_items
+        : [],
+    });
+
+    setAcademicsContent({
+      ...defaultAcademicsContent,
+      ...loadedAcademicsContent,
+      programs: Array.isArray(loadedAcademicsContent.programs)
+        ? loadedAcademicsContent.programs
+        : [],
+      curriculum_semesters: Array.isArray(loadedAcademicsContent.curriculum_semesters)
+        ? loadedAcademicsContent.curriculum_semesters
+        : [],
+      facilities_items: Array.isArray(loadedAcademicsContent.facilities_items)
+        ? loadedAcademicsContent.facilities_items
         : [],
     });
 
@@ -567,6 +625,135 @@ const AdminDashboard = () => {
       [field]: (Array.isArray(previous[field]) ? previous[field] : []).filter(
         (_item, currentIndex) => currentIndex !== index
       ),
+    }));
+  };
+
+  const parseMultilineList = (value) =>
+    String(value || '')
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+  const formatMultilineList = (list) =>
+    (Array.isArray(list) ? list : []).map((item) => String(item || '').trim()).filter(Boolean).join('\n');
+
+  const saveAcademicsContent = () => {
+    const programs = (Array.isArray(academicsContent.programs) ? academicsContent.programs : [])
+      .map((program) => ({
+        title: String(program?.title || '').trim(),
+        link_url: String(program?.link_url || '').trim() || null,
+        link_target: String(program?.link_target || '_blank').trim() || '_blank',
+        duration: String(program?.duration || '').trim(),
+        intake: String(program?.intake || '').trim() || null,
+        description: String(program?.description || '').trim(),
+        highlights: Array.isArray(program?.highlights)
+          ? program.highlights.map((item) => String(item || '').trim()).filter(Boolean)
+          : [],
+        courses: Array.isArray(program?.courses)
+          ? program.courses.map((item) => String(item || '').trim()).filter(Boolean)
+          : [],
+      }))
+      .filter((program) => program.title || program.description);
+
+    if (programs.some((program) => !program.title || !program.duration || !program.description)) {
+      setError('Each program needs title, duration, and description, or remove the incomplete row.');
+      return;
+    }
+
+    const curriculumSemesters = (
+      Array.isArray(academicsContent.curriculum_semesters)
+        ? academicsContent.curriculum_semesters
+        : []
+    )
+      .map((semester) => ({
+        semester_label: String(semester?.semester_label || '').trim(),
+        courses: Array.isArray(semester?.courses)
+          ? semester.courses.map((item) => String(item || '').trim()).filter(Boolean)
+          : [],
+      }))
+      .filter((semester) => semester.semester_label || semester.courses.length > 0);
+
+    if (curriculumSemesters.some((semester) => !semester.semester_label || semester.courses.length === 0)) {
+      setError('Each curriculum semester needs a label and at least one course.');
+      return;
+    }
+
+    const facilitiesItems = (Array.isArray(academicsContent.facilities_items)
+      ? academicsContent.facilities_items
+      : []
+    )
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+
+    const payload = {
+      ...academicsContent,
+      programs,
+      curriculum_semesters: curriculumSemesters,
+      facilities_items: facilitiesItems,
+    };
+
+    delete payload.id;
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    runAction(
+      () => updateAcademicsContent(payload),
+      'Academics content updated successfully.'
+    );
+  };
+
+  const addAcademicsProgram = () => {
+    setAcademicsContent((previous) => ({
+      ...previous,
+      programs: [...(Array.isArray(previous.programs) ? previous.programs : []), { ...defaultAcademicsProgram }],
+    }));
+  };
+
+  const updateAcademicsProgram = (index, nextItem) => {
+    setAcademicsContent((previous) => ({
+      ...previous,
+      programs: (Array.isArray(previous.programs) ? previous.programs : []).map((item, currentIndex) =>
+        currentIndex === index ? { ...item, ...nextItem } : item
+      ),
+    }));
+  };
+
+  const removeAcademicsProgram = (index) => {
+    setAcademicsContent((previous) => ({
+      ...previous,
+      programs: (Array.isArray(previous.programs) ? previous.programs : []).filter(
+        (_item, currentIndex) => currentIndex !== index
+      ),
+    }));
+  };
+
+  const addAcademicsSemester = () => {
+    setAcademicsContent((previous) => ({
+      ...previous,
+      curriculum_semesters: [
+        ...(Array.isArray(previous.curriculum_semesters) ? previous.curriculum_semesters : []),
+        { ...defaultAcademicsSemester },
+      ],
+    }));
+  };
+
+  const updateAcademicsSemester = (index, nextItem) => {
+    setAcademicsContent((previous) => ({
+      ...previous,
+      curriculum_semesters: (
+        Array.isArray(previous.curriculum_semesters) ? previous.curriculum_semesters : []
+      ).map((item, currentIndex) =>
+        currentIndex === index ? { ...item, ...nextItem } : item
+      ),
+    }));
+  };
+
+  const removeAcademicsSemester = (index) => {
+    setAcademicsContent((previous) => ({
+      ...previous,
+      curriculum_semesters: (
+        Array.isArray(previous.curriculum_semesters) ? previous.curriculum_semesters : []
+      ).filter((_item, currentIndex) => currentIndex !== index),
     }));
   };
 
@@ -2031,6 +2218,411 @@ const AdminDashboard = () => {
                   className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
                 >
                   Save About Content
+                </button>
+              </section>
+            )}
+
+            {activeSection === 'academics-content' && (
+              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900">Academics Content</h2>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.hero_title}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          hero_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={academicsContent.hero_subtitle}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          hero_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Programs Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.programs_title}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          programs_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Programs Section Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={academicsContent.programs_subtitle}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          programs_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Programs</h3>
+                      <button
+                        type="button"
+                        onClick={addAcademicsProgram}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Program
+                      </button>
+                    </div>
+
+                    {(Array.isArray(academicsContent.programs) ? academicsContent.programs : []).map((program, index) => (
+                      <div key={`academics-program-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
+                        <label className="text-xs text-gray-700 md:col-span-6">
+                          Program Title
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={program.title || ''}
+                            onChange={(event) =>
+                              updateAcademicsProgram(index, { title: event.target.value })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-4">
+                          Link URL (optional)
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={program.link_url || ''}
+                            onChange={(event) =>
+                              updateAcademicsProgram(index, { link_url: event.target.value })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-2">
+                          Link Target
+                          <select
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={program.link_target || '_blank'}
+                            onChange={(event) =>
+                              updateAcademicsProgram(index, { link_target: event.target.value })
+                            }
+                          >
+                            <option value="_blank">New Tab</option>
+                            <option value="_self">Same Tab</option>
+                          </select>
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-3">
+                          Duration
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={program.duration || ''}
+                            onChange={(event) =>
+                              updateAcademicsProgram(index, { duration: event.target.value })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-4">
+                          Intake (optional)
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={program.intake || ''}
+                            onChange={(event) =>
+                              updateAcademicsProgram(index, { intake: event.target.value })
+                            }
+                          />
+                        </label>
+
+                        <div className="md:col-span-5 flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => removeAcademicsProgram(index)}
+                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+                          >
+                            Remove Program
+                          </button>
+                        </div>
+
+                        <label className="text-xs text-gray-700 md:col-span-12">
+                          Description
+                          <textarea
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm"
+                            value={program.description || ''}
+                            onChange={(event) =>
+                              updateAcademicsProgram(index, { description: event.target.value })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-6">
+                          Highlights (one per line)
+                          <textarea
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-24 text-sm"
+                            value={formatMultilineList(program.highlights)}
+                            onChange={(event) =>
+                              updateAcademicsProgram(index, {
+                                highlights: parseMultilineList(event.target.value),
+                              })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-6">
+                          Courses (one per line)
+                          <textarea
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-24 text-sm"
+                            value={formatMultilineList(program.courses)}
+                            onChange={(event) =>
+                              updateAcademicsProgram(index, {
+                                courses: parseMultilineList(event.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Curriculum Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.curriculum_title}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          curriculum_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Curriculum Section Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={academicsContent.curriculum_subtitle}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          curriculum_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Curriculum Semesters</h3>
+                      <button
+                        type="button"
+                        onClick={addAcademicsSemester}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Semester
+                      </button>
+                    </div>
+
+                    {(Array.isArray(academicsContent.curriculum_semesters)
+                      ? academicsContent.curriculum_semesters
+                      : []
+                    ).map((semester, index) => (
+                      <div key={`academics-semester-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
+                        <label className="text-xs text-gray-700 md:col-span-4">
+                          Semester Label
+                          <input
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                            value={semester.semester_label || ''}
+                            onChange={(event) =>
+                              updateAcademicsSemester(index, {
+                                semester_label: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+
+                        <label className="text-xs text-gray-700 md:col-span-7">
+                          Courses (one per line)
+                          <textarea
+                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-24 text-sm"
+                            value={formatMultilineList(semester.courses)}
+                            onChange={(event) =>
+                              updateAcademicsSemester(index, {
+                                courses: parseMultilineList(event.target.value),
+                              })
+                            }
+                          />
+                        </label>
+
+                        <div className="md:col-span-1 flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => removeAcademicsSemester(index)}
+                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Facilities Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.facilities_title}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          facilities_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Facilities Section Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={academicsContent.facilities_subtitle}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          facilities_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Facilities (one per line)
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-28"
+                      value={formatMultilineList(academicsContent.facilities_items)}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          facilities_items: parseMultilineList(event.target.value),
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Admission Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.admission_title}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          admission_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Admission Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={academicsContent.admission_subtitle}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          admission_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Primary Button Text
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.admission_primary_text}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          admission_primary_text: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Primary Button Link
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.admission_primary_link}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          admission_primary_link: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Secondary Button Text
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.admission_secondary_text}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          admission_secondary_text: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Secondary Button Link
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={academicsContent.admission_secondary_link}
+                      onChange={(event) =>
+                        setAcademicsContent((previous) => ({
+                          ...previous,
+                          admission_secondary_link: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveAcademicsContent}
+                  disabled={isWorking}
+                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
+                >
+                  Save Academics Content
                 </button>
               </section>
             )}

@@ -94,6 +94,29 @@ CREATE TABLE IF NOT EXISTS about_content (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS academics_content (
+  id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+  hero_title VARCHAR(255) NOT NULL,
+  hero_subtitle TEXT NOT NULL,
+  programs_title VARCHAR(255) NOT NULL,
+  programs_subtitle TEXT NOT NULL,
+  programs JSON NOT NULL,
+  curriculum_title VARCHAR(255) NOT NULL,
+  curriculum_subtitle TEXT NOT NULL,
+  curriculum_semesters JSON NOT NULL,
+  facilities_title VARCHAR(255) NOT NULL,
+  facilities_subtitle TEXT NOT NULL,
+  facilities_items JSON NOT NULL,
+  admission_title VARCHAR(255) NOT NULL,
+  admission_subtitle TEXT NOT NULL,
+  admission_primary_text VARCHAR(120) NOT NULL,
+  admission_primary_link VARCHAR(512) NOT NULL,
+  admission_secondary_text VARCHAR(120) NOT NULL,
+  admission_secondary_link VARCHAR(512) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS home_hero_slides (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   image_url VARCHAR(512) NOT NULL,

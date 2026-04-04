@@ -25,8 +25,8 @@ const publicContentFetchers = {
     optional: false,
   },
   academics: {
-    fetcher: optionalPublicEndpointFetcher("/api/public/academics"),
-    optional: true,
+    fetcher: () => requestJson("/api/public/academics"),
+    optional: false,
   },
   people: {
     fetcher: optionalPublicEndpointFetcher("/api/public/people"),
@@ -328,6 +328,13 @@ export function updateHomeContent(payload) {
 
 export function updateAboutContent(payload) {
   return adminRequest("/api/admin/about-content", {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function updateAcademicsContent(payload) {
+  return adminRequest("/api/admin/academics-content", {
     method: "PUT",
     body: payload,
   });

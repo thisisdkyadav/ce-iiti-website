@@ -113,6 +113,33 @@ router.get("/about", async (_req, res) => {
   }
 });
 
+router.get("/academics", async (_req, res) => {
+  try {
+    const [academicsContent] = await query(
+      "SELECT * FROM academics_content WHERE id = 1 LIMIT 1"
+    );
+
+    if (!academicsContent) {
+      return res.json({ academicsContent: null });
+    }
+
+    return res.json({
+      academicsContent: {
+        ...academicsContent,
+        programs: parseMaybeJson(academicsContent.programs) || [],
+        curriculum_semesters:
+          parseMaybeJson(academicsContent.curriculum_semesters) || [],
+        facilities_items: parseMaybeJson(academicsContent.facilities_items) || [],
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch academics content",
+      message: error.message,
+    });
+  }
+});
+
 router.get("/people", async (_req, res) => {
   try {
     const entries = await query(
