@@ -24,6 +24,7 @@ import {
   updateHeroSlide,
   updateAcademicsContent,
   updateAboutContent,
+  updateEventsContent,
   updateSpecializationsContent,
   updateHomeContent,
   updateHomeStat,
@@ -185,6 +186,31 @@ const defaultSpecializationsContent = {
   laboratory_rows: [],
 };
 
+const defaultEventsItem = {
+  date: '',
+  title: '',
+  description: '',
+  time: '',
+  venue: '',
+  category: 'Seminar',
+  image_url: '',
+  registration_link: '',
+};
+
+const defaultEventsContent = {
+  hero_title: '',
+  hero_subtitle: '',
+  search_placeholder: 'Search events by title, description, or category...',
+  tab_news_label: 'News & Updates',
+  tab_upcoming_label: 'Upcoming Events',
+  tab_past_label: 'Past Events',
+  no_news_message: 'No news found matching your criteria.',
+  no_upcoming_message: 'No upcoming events at the moment.',
+  no_past_message: 'No past events recorded recently.',
+  upcoming_events: [],
+  past_events: [],
+};
+
 const specializationColorOptions = ['blue', 'amber', 'green', 'cyan', 'emerald'];
 const specializationIconOptions = ['Building', 'Microscope', 'Target', 'FlaskConical', 'Award'];
 
@@ -275,6 +301,7 @@ const adminSectionGroups = [
       { key: 'home-content', label: 'Home Content' },
       { key: 'about-content', label: 'About Content' },
       { key: 'academics-content', label: 'Academics Content' },
+      { key: 'events-content', label: 'Events Content' },
       { key: 'specializations-content', label: 'Specializations Content' },
     ],
   },
@@ -320,6 +347,10 @@ const sectionDetails = {
   'specializations-content': {
     title: 'Specializations Content',
     description: 'Specialization cards, faculty, lab equipment, and laboratories table.',
+  },
+  'events-content': {
+    title: 'Events Content',
+    description: 'Events page text plus upcoming and past event cards.',
   },
   navigation: {
     title: 'Navigation Items',
@@ -401,6 +432,7 @@ const AdminDashboard = () => {
   const [homeContent, setHomeContent] = useState(defaultHomeContent);
   const [aboutContent, setAboutContent] = useState(defaultAboutContent);
   const [academicsContent, setAcademicsContent] = useState(defaultAcademicsContent);
+  const [eventsContent, setEventsContent] = useState(defaultEventsContent);
   const [specializationsContent, setSpecializationsContent] = useState(defaultSpecializationsContent);
   const [navigationItems, setNavigationItems] = useState([]);
   const [socialLinks, setSocialLinks] = useState([]);
@@ -425,6 +457,7 @@ const AdminDashboard = () => {
     const loadedHomeContent = data?.homeContent || {};
     const loadedAboutContent = data?.aboutContent || {};
     const loadedAcademicsContent = data?.academicsContent || {};
+    const loadedEventsContent = data?.eventsContent || {};
     const loadedSpecializationsContent = data?.specializationsContent || {};
 
     setSiteSettings({
@@ -476,6 +509,17 @@ const AdminDashboard = () => {
         : [],
       laboratory_rows: Array.isArray(loadedSpecializationsContent.laboratory_rows)
         ? loadedSpecializationsContent.laboratory_rows
+        : [],
+    });
+
+    setEventsContent({
+      ...defaultEventsContent,
+      ...loadedEventsContent,
+      upcoming_events: Array.isArray(loadedEventsContent.upcoming_events)
+        ? loadedEventsContent.upcoming_events
+        : [],
+      past_events: Array.isArray(loadedEventsContent.past_events)
+        ? loadedEventsContent.past_events
         : [],
     });
 
@@ -1173,6 +1217,74 @@ const AdminDashboard = () => {
       laboratory_rows: (
         Array.isArray(previous.laboratory_rows) ? previous.laboratory_rows : []
       ).filter((_row, currentIndex) => currentIndex !== index),
+    }));
+  };
+
+  const saveEventsContent = () => {
+    const normalizeEventsList = (items) =>
+      (Array.isArray(items) ? items : [])
+        .map((item) => ({
+          date: String(item?.date || '').trim(),
+          title: String(item?.title || '').trim(),
+          description: String(item?.description || '').trim(),
+          time: String(item?.time || '').trim() || null,
+          venue: String(item?.venue || '').trim() || null,
+          category: String(item?.category || '').trim() || 'General',
+          image_url: String(item?.image_url || '').trim() || null,
+          registration_link: String(item?.registration_link || '').trim() || null,
+        }))
+        .filter((item) => item.date || item.title || item.description);
+
+    const upcomingEvents = normalizeEventsList(eventsContent.upcoming_events);
+    const pastEvents = normalizeEventsList(eventsContent.past_events);
+
+    if (
+      [...upcomingEvents, ...pastEvents].some(
+        (item) => !item.date || !item.title || !item.description,
+      )
+    ) {
+      setError('Each event requires date, title, and description, or remove the incomplete row.');
+      return;
+    }
+
+    const payload = {
+      ...eventsContent,
+      upcoming_events: upcomingEvents,
+      past_events: pastEvents,
+    };
+
+    delete payload.id;
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    runAction(
+      () => updateEventsContent(payload),
+      'Events content updated successfully.',
+    );
+  };
+
+  const addEventsListItem = (field) => {
+    setEventsContent((previous) => ({
+      ...previous,
+      [field]: [...(Array.isArray(previous[field]) ? previous[field] : []), { ...defaultEventsItem }],
+    }));
+  };
+
+  const updateEventsListItem = (field, index, nextItem) => {
+    setEventsContent((previous) => ({
+      ...previous,
+      [field]: (Array.isArray(previous[field]) ? previous[field] : []).map((item, currentIndex) =>
+        currentIndex === index ? { ...item, ...nextItem } : item,
+      ),
+    }));
+  };
+
+  const removeEventsListItem = (field, index) => {
+    setEventsContent((previous) => ({
+      ...previous,
+      [field]: (Array.isArray(previous[field]) ? previous[field] : []).filter(
+        (_item, currentIndex) => currentIndex !== index,
+      ),
     }));
   };
 
@@ -3042,6 +3154,398 @@ const AdminDashboard = () => {
                   className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
                 >
                   Save Academics Content
+                </button>
+              </section>
+            )}
+
+            {activeSection === 'events-content' && (
+              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900">Events Content</h2>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={eventsContent.hero_title}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          hero_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={eventsContent.hero_subtitle}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          hero_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Search Placeholder
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={eventsContent.search_placeholder}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          search_placeholder: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    News Tab Label
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={eventsContent.tab_news_label}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          tab_news_label: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Upcoming Tab Label
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={eventsContent.tab_upcoming_label}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          tab_upcoming_label: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Past Tab Label
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={eventsContent.tab_past_label}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          tab_past_label: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Empty Message (News)
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={eventsContent.no_news_message}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          no_news_message: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Empty Message (Upcoming)
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={eventsContent.no_upcoming_message}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          no_upcoming_message: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Empty Message (Past)
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={eventsContent.no_past_message}
+                      onChange={(event) =>
+                        setEventsContent((previous) => ({
+                          ...previous,
+                          no_past_message: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Upcoming Events</h3>
+                      <button
+                        type="button"
+                        onClick={() => addEventsListItem('upcoming_events')}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Upcoming Event
+                      </button>
+                    </div>
+
+                    {(Array.isArray(eventsContent.upcoming_events)
+                      ? eventsContent.upcoming_events
+                      : []
+                    ).map((item, index) => (
+                      <div key={`upcoming-event-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
+                        <input
+                          type="date"
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-2"
+                          value={item.date || ''}
+                          onChange={(event) =>
+                            updateEventsListItem('upcoming_events', index, {
+                              date: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
+                          placeholder="Event Title"
+                          value={item.title || ''}
+                          onChange={(event) =>
+                            updateEventsListItem('upcoming_events', index, {
+                              title: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-2"
+                          placeholder="Category"
+                          value={item.category || ''}
+                          onChange={(event) =>
+                            updateEventsListItem('upcoming_events', index, {
+                              category: event.target.value,
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeEventsListItem('upcoming_events', index)}
+                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-3"
+                        >
+                          Remove
+                        </button>
+
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                          placeholder="Time (optional)"
+                          value={item.time || ''}
+                          onChange={(event) =>
+                            updateEventsListItem('upcoming_events', index, {
+                              time: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
+                          placeholder="Venue (optional)"
+                          value={item.venue || ''}
+                          onChange={(event) =>
+                            updateEventsListItem('upcoming_events', index, {
+                              venue: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
+                          placeholder="Registration Link (optional)"
+                          value={item.registration_link || ''}
+                          onChange={(event) =>
+                            updateEventsListItem('upcoming_events', index, {
+                              registration_link: event.target.value,
+                            })
+                          }
+                        />
+
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-8"
+                          placeholder="Image URL (optional)"
+                          value={item.image_url || ''}
+                          onChange={(event) =>
+                            updateEventsListItem('upcoming_events', index, {
+                              image_url: event.target.value,
+                            })
+                          }
+                        />
+                        <label className="text-xs text-gray-700 md:col-span-4">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="block w-full text-xs"
+                            onChange={(event) =>
+                              uploadImage(event.target.files?.[0], 'events', (uploadedUrl) => {
+                                updateEventsListItem('upcoming_events', index, {
+                                  image_url: uploadedUrl,
+                                });
+                              })
+                            }
+                          />
+                        </label>
+
+                        <textarea
+                          className="rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm md:col-span-12"
+                          placeholder="Description"
+                          value={item.description || ''}
+                          onChange={(event) =>
+                            updateEventsListItem('upcoming_events', index, {
+                              description: event.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Past Events</h3>
+                      <button
+                        type="button"
+                        onClick={() => addEventsListItem('past_events')}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Past Event
+                      </button>
+                    </div>
+
+                    {(Array.isArray(eventsContent.past_events) ? eventsContent.past_events : []).map(
+                      (item, index) => (
+                        <div key={`past-event-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
+                          <input
+                            type="date"
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-2"
+                            value={item.date || ''}
+                            onChange={(event) =>
+                              updateEventsListItem('past_events', index, {
+                                date: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
+                            placeholder="Event Title"
+                            value={item.title || ''}
+                            onChange={(event) =>
+                              updateEventsListItem('past_events', index, {
+                                title: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-2"
+                            placeholder="Category"
+                            value={item.category || ''}
+                            onChange={(event) =>
+                              updateEventsListItem('past_events', index, {
+                                category: event.target.value,
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeEventsListItem('past_events', index)}
+                            className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-3"
+                          >
+                            Remove
+                          </button>
+
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
+                            placeholder="Time (optional)"
+                            value={item.time || ''}
+                            onChange={(event) =>
+                              updateEventsListItem('past_events', index, {
+                                time: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
+                            placeholder="Venue (optional)"
+                            value={item.venue || ''}
+                            onChange={(event) =>
+                              updateEventsListItem('past_events', index, {
+                                venue: event.target.value,
+                              })
+                            }
+                          />
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
+                            placeholder="Registration Link (optional)"
+                            value={item.registration_link || ''}
+                            onChange={(event) =>
+                              updateEventsListItem('past_events', index, {
+                                registration_link: event.target.value,
+                              })
+                            }
+                          />
+
+                          <input
+                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-8"
+                            placeholder="Image URL (optional)"
+                            value={item.image_url || ''}
+                            onChange={(event) =>
+                              updateEventsListItem('past_events', index, {
+                                image_url: event.target.value,
+                              })
+                            }
+                          />
+                          <label className="text-xs text-gray-700 md:col-span-4">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="block w-full text-xs"
+                              onChange={(event) =>
+                                uploadImage(event.target.files?.[0], 'events', (uploadedUrl) => {
+                                  updateEventsListItem('past_events', index, {
+                                    image_url: uploadedUrl,
+                                  });
+                                })
+                              }
+                            />
+                          </label>
+
+                          <textarea
+                            className="rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm md:col-span-12"
+                            placeholder="Description"
+                            value={item.description || ''}
+                            onChange={(event) =>
+                              updateEventsListItem('past_events', index, {
+                                description: event.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveEventsContent}
+                  disabled={isWorking}
+                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
+                >
+                  Save Events Content
                 </button>
               </section>
             )}

@@ -165,6 +165,34 @@ router.get("/specializations", async (_req, res) => {
   }
 });
 
+router.get("/events", async (_req, res) => {
+  try {
+    const [eventsContent] = await query(
+      "SELECT * FROM events_content WHERE id = 1 LIMIT 1"
+    );
+
+    const news = await query(
+      "SELECT id, title, excerpt, category, image_url, external_link, publish_date FROM news_items WHERE is_active = 1 ORDER BY publish_date DESC, id DESC LIMIT 100"
+    );
+
+    return res.json({
+      eventsContent: eventsContent
+        ? {
+            ...eventsContent,
+            upcoming_events: parseMaybeJson(eventsContent.upcoming_events) || [],
+            past_events: parseMaybeJson(eventsContent.past_events) || [],
+          }
+        : null,
+      news,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch events content",
+      message: error.message,
+    });
+  }
+});
+
 router.get("/people", async (_req, res) => {
   try {
     const entries = await query(

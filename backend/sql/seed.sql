@@ -4,6 +4,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE admin_sessions;
 TRUNCATE TABLE news_items;
 TRUNCATE TABLE people_entries;
+TRUNCATE TABLE events_content;
 TRUNCATE TABLE specializations_content;
 TRUNCATE TABLE academics_content;
 TRUNCATE TABLE about_content;
@@ -290,6 +291,47 @@ ON DUPLICATE KEY UPDATE
   specializations = VALUES(specializations),
   laboratories_title = VALUES(laboratories_title),
   laboratory_rows = VALUES(laboratory_rows);
+
+INSERT INTO events_content (
+  id,
+  hero_title,
+  hero_subtitle,
+  search_placeholder,
+  tab_news_label,
+  tab_upcoming_label,
+  tab_past_label,
+  no_news_message,
+  no_upcoming_message,
+  no_past_message,
+  upcoming_events,
+  past_events
+)
+VALUES (
+  1,
+  'Events & Activities',
+  'Stay connected with our academic events, workshops, conferences, and departmental activities',
+  'Search events by title, description, or category...',
+  'News & Updates',
+  'Upcoming Events',
+  'Past Events',
+  'No news found matching your criteria.',
+  'No upcoming events at the moment.',
+  'No past events recorded recently.',
+  '[]',
+  '[{"date":"2026-01-22","title":"REIMAGINING CONSTRUCTION PARADIGMS: STEEL FOR THE NEXT GENERATION","description":"The Indian Institute of Technology Indore (IITI), in association with the Institute for Steel Development and Growth (INSDAG), is pleased to invite students, researchers, faculty members, and industry professionals to a one-day Technical Seminar on REIMAGINING CONSTRUCTION PARADIGMS: STEEL FOR THE NEXT GENERATION.","time":"09:00 AM - 05:00 PM","venue":"1D-105, IIT Indore Campus","category":"Seminar","image_url":"/assets/Events/steel.jpg","registration_link":"https://docs.google.com/forms/d/1oTXpXYolZUIVl8vKsj0q_HRgBIjvkn-NXKQ5Nc4qKCQ/edit?ts=69390ad1&pli=1"}]'
+)
+ON DUPLICATE KEY UPDATE
+  hero_title = VALUES(hero_title),
+  hero_subtitle = VALUES(hero_subtitle),
+  search_placeholder = VALUES(search_placeholder),
+  tab_news_label = VALUES(tab_news_label),
+  tab_upcoming_label = VALUES(tab_upcoming_label),
+  tab_past_label = VALUES(tab_past_label),
+  no_news_message = VALUES(no_news_message),
+  no_upcoming_message = VALUES(no_upcoming_message),
+  no_past_message = VALUES(no_past_message),
+  upcoming_events = VALUES(upcoming_events),
+  past_events = VALUES(past_events);
 
 INSERT INTO home_hero_slides (image_url, title, subtitle, cta_text, cta_link, sort_order, is_active)
 VALUES

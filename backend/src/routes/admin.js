@@ -180,6 +180,31 @@ const specializationsContentPatchSchema = nonEmptyPatch({
   laboratory_rows: z.array(laboratoryRowSchema),
 });
 
+const eventsItemSchema = z.object({
+  date: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  time: z.string().nullable().optional(),
+  venue: z.string().nullable().optional(),
+  category: z.string().min(1),
+  image_url: z.string().nullable().optional(),
+  registration_link: z.string().nullable().optional(),
+});
+
+const eventsContentPatchSchema = nonEmptyPatch({
+  hero_title: z.string().min(1),
+  hero_subtitle: z.string().min(1),
+  search_placeholder: z.string().min(1),
+  tab_news_label: z.string().min(1),
+  tab_upcoming_label: z.string().min(1),
+  tab_past_label: z.string().min(1),
+  no_news_message: z.string().min(1),
+  no_upcoming_message: z.string().min(1),
+  no_past_message: z.string().min(1),
+  upcoming_events: z.array(eventsItemSchema),
+  past_events: z.array(eventsItemSchema),
+});
+
 const navigationItemCreateSchema = z.object({
   label: z.string().min(1),
   href: z.string().min(1),
@@ -482,6 +507,32 @@ function normalizeSpecializationsPayload(payload) {
   return nextPayload;
 }
 
+function serializeEventsContent(eventsContent) {
+  if (!eventsContent) {
+    return null;
+  }
+
+  return {
+    ...eventsContent,
+    upcoming_events: parseMaybeJson(eventsContent.upcoming_events) || [],
+    past_events: parseMaybeJson(eventsContent.past_events) || [],
+  };
+}
+
+function normalizeEventsPayload(payload) {
+  const nextPayload = { ...payload };
+
+  if (nextPayload.upcoming_events !== undefined) {
+    nextPayload.upcoming_events = JSON.stringify(nextPayload.upcoming_events || []);
+  }
+
+  if (nextPayload.past_events !== undefined) {
+    nextPayload.past_events = JSON.stringify(nextPayload.past_events || []);
+  }
+
+  return nextPayload;
+}
+
 function sanitizeUploadCategory(rawCategory) {
   const normalized = String(rawCategory || "general")
     .toLowerCase()
@@ -669,6 +720,10 @@ router.get("/content", async (_req, res) => {
       "SELECT * FROM specializations_content WHERE id = 1 LIMIT 1"
     );
 
+    const [eventsContent] = await query(
+      "SELECT * FROM events_content WHERE id = 1 LIMIT 1"
+    );
+
     const navigation = await query(
       "SELECT id, label, href, sort_order, is_active FROM navigation_items ORDER BY sort_order ASC, id ASC"
     );
@@ -708,6 +763,7 @@ router.get("/content", async (_req, res) => {
       aboutContent: serializeAboutContent(aboutContent),
       academicsContent: serializeAcademicsContent(academicsContent),
       specializationsContent: serializeSpecializationsContent(specializationsContent),
+      eventsContent: serializeEventsContent(eventsContent),
       navigation,
       socialLinks,
       footerLinks,
@@ -1167,6 +1223,97 @@ router.put("/specializations-content", async (req, res) => {
           insertPayload.specializations,
           insertPayload.laboratories_title,
           insertPayload.laboratory_rows,
+        ]
+      );
+    }
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/events-content", async (req, res) => {
+  const parsed = eventsContentPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const allowedFields = [
+    "hero_title",
+    "hero_subtitle",
+    "search_placeholder",
+    "tab_news_label",
+    "tab_upcoming_label",
+    "tab_past_label",
+    "no_news_message",
+    "no_upcoming_message",
+    "no_past_message",
+    "upcoming_events",
+    "past_events",
+  ];
+
+  try {
+    const payload = normalizeEventsPayload(parsed.data);
+    const update = buildUpdateClause(payload, allowedFields);
+    if (!update) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    const [existingRow] = await query(
+      "SELECT id FROM events_content WHERE id = 1 LIMIT 1"
+    );
+
+    if (existingRow) {
+      await query(
+        `UPDATE events_content SET ${update.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
+        update.values
+      );
+    } else {
+      const insertPayload = {
+        hero_title: "Events & Activities",
+        hero_subtitle:
+          "Stay connected with our academic events, workshops, conferences, and departmental activities",
+        search_placeholder: "Search events by title, description, or category...",
+        tab_news_label: "News & Updates",
+        tab_upcoming_label: "Upcoming Events",
+        tab_past_label: "Past Events",
+        no_news_message: "No news found matching your criteria.",
+        no_upcoming_message: "No upcoming events at the moment.",
+        no_past_message: "No past events recorded recently.",
+        upcoming_events: "[]",
+        past_events: "[]",
+        ...payload,
+      };
+
+      await query(
+        `INSERT INTO events_content (
+          id,
+          hero_title,
+          hero_subtitle,
+          search_placeholder,
+          tab_news_label,
+          tab_upcoming_label,
+          tab_past_label,
+          no_news_message,
+          no_upcoming_message,
+          no_past_message,
+          upcoming_events,
+          past_events
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          1,
+          insertPayload.hero_title,
+          insertPayload.hero_subtitle,
+          insertPayload.search_placeholder,
+          insertPayload.tab_news_label,
+          insertPayload.tab_upcoming_label,
+          insertPayload.tab_past_label,
+          insertPayload.no_news_message,
+          insertPayload.no_upcoming_message,
+          insertPayload.no_past_message,
+          insertPayload.upcoming_events,
+          insertPayload.past_events,
         ]
       );
     }
