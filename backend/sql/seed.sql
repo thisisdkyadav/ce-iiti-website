@@ -4,6 +4,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE admin_sessions;
 TRUNCATE TABLE news_items;
 TRUNCATE TABLE people_entries;
+TRUNCATE TABLE specializations_content;
 TRUNCATE TABLE academics_content;
 TRUNCATE TABLE about_content;
 TRUNCATE TABLE home_stats;
@@ -254,6 +255,41 @@ ON DUPLICATE KEY UPDATE
   admission_primary_link = VALUES(admission_primary_link),
   admission_secondary_text = VALUES(admission_secondary_text),
   admission_secondary_link = VALUES(admission_secondary_link);
+
+INSERT INTO specializations_content (
+  id,
+  hero_title,
+  hero_subtitle,
+  specializations_tab_label,
+  laboratories_tab_label,
+  specializations_title,
+  specializations_subtitle,
+  specializations,
+  laboratories_title,
+  laboratory_rows
+)
+VALUES (
+  1,
+  'Our Specializations',
+  'Explore our five core areas of expertise and state-of-the-art laboratory facilities that drive innovation in civil engineering',
+  'Specializations',
+  'Laboratories',
+  'Areas of Expertise',
+  'Each specialization offers unique opportunities for advanced learning and cutting-edge research',
+  '[]',
+  'Laboratory Facilities',
+  '[{"name":"Computational Laboratory","location":"POD 1C"},{"name":"Engineering Geology Laboratory","location":"POD 1C"},{"name":"Environmental Engineering Laboratory","location":"POD 1C"},{"name":"Fluid Mechanics Laboratory","location":"POD 1C"},{"name":"Geotechnical Engineering Laboratory- 01","location":"POD 1C"},{"name":"Geotechnical Engineering Laboratory- 02","location":"POD 1C"},{"name":"Geodesy & Surveying Laboratory","location":"POD 1C"},{"name":"Hydraulics and Hydrology Laboratory","location":"POD 1C"},{"name":"Materials Engineering Laboratory","location":"POD 1C"},{"name":"Solid Mechanics Laboratory","location":"POD 1C"},{"name":"Transportation Engineering Laboratory","location":"POD 1C"},{"name":"Structure Engineering Laboratory","location":"POD 1C"}]'
+)
+ON DUPLICATE KEY UPDATE
+  hero_title = VALUES(hero_title),
+  hero_subtitle = VALUES(hero_subtitle),
+  specializations_tab_label = VALUES(specializations_tab_label),
+  laboratories_tab_label = VALUES(laboratories_tab_label),
+  specializations_title = VALUES(specializations_title),
+  specializations_subtitle = VALUES(specializations_subtitle),
+  specializations = VALUES(specializations),
+  laboratories_title = VALUES(laboratories_title),
+  laboratory_rows = VALUES(laboratory_rows);
 
 INSERT INTO home_hero_slides (image_url, title, subtitle, cta_text, cta_link, sort_order, is_active)
 VALUES

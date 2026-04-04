@@ -34,7 +34,7 @@ const publicContentFetchers = {
   },
   specializations: {
     fetcher: optionalPublicEndpointFetcher("/api/public/specializations"),
-    optional: true,
+    optional: false,
   },
   events: {
     fetcher: optionalPublicEndpointFetcher("/api/public/events"),
@@ -335,6 +335,13 @@ export function updateAboutContent(payload) {
 
 export function updateAcademicsContent(payload) {
   return adminRequest("/api/admin/academics-content", {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function updateSpecializationsContent(payload) {
+  return adminRequest("/api/admin/specializations-content", {
     method: "PUT",
     body: payload,
   });

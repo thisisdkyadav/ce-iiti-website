@@ -117,6 +117,21 @@ CREATE TABLE IF NOT EXISTS academics_content (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS specializations_content (
+  id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+  hero_title VARCHAR(255) NOT NULL,
+  hero_subtitle TEXT NOT NULL,
+  specializations_tab_label VARCHAR(120) NOT NULL,
+  laboratories_tab_label VARCHAR(120) NOT NULL,
+  specializations_title VARCHAR(255) NOT NULL,
+  specializations_subtitle TEXT NOT NULL,
+  specializations JSON NOT NULL,
+  laboratories_title VARCHAR(255) NOT NULL,
+  laboratory_rows JSON NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS home_hero_slides (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   image_url VARCHAR(512) NOT NULL,

@@ -137,6 +137,49 @@ const academicsContentPatchSchema = nonEmptyPatch({
   admission_secondary_link: z.string().min(1),
 });
 
+const specializationFacultySchema = z.object({
+  name: z.string().min(1),
+  url: z.string().nullable().optional(),
+});
+
+const specializationEquipmentSchema = z.object({
+  name: z.string().min(1),
+  image_url: z.string().nullable().optional(),
+});
+
+const specializationLabSchema = z.object({
+  name: z.string().min(1),
+  equipments: z.array(specializationEquipmentSchema),
+});
+
+const specializationItemSchema = z.object({
+  key: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().min(1),
+  color: z.string().min(1),
+  icon_name: z.string().min(1),
+  image_url: z.string().min(1),
+  faculty: z.array(specializationFacultySchema),
+  labs: z.array(specializationLabSchema),
+});
+
+const laboratoryRowSchema = z.object({
+  name: z.string().min(1),
+  location: z.string().min(1),
+});
+
+const specializationsContentPatchSchema = nonEmptyPatch({
+  hero_title: z.string().min(1),
+  hero_subtitle: z.string().min(1),
+  specializations_tab_label: z.string().min(1),
+  laboratories_tab_label: z.string().min(1),
+  specializations_title: z.string().min(1),
+  specializations_subtitle: z.string().min(1),
+  specializations: z.array(specializationItemSchema),
+  laboratories_title: z.string().min(1),
+  laboratory_rows: z.array(laboratoryRowSchema),
+});
+
 const navigationItemCreateSchema = z.object({
   label: z.string().min(1),
   href: z.string().min(1),
@@ -413,6 +456,32 @@ function normalizeAcademicsPayload(payload) {
   return nextPayload;
 }
 
+function serializeSpecializationsContent(specializationsContent) {
+  if (!specializationsContent) {
+    return null;
+  }
+
+  return {
+    ...specializationsContent,
+    specializations: parseMaybeJson(specializationsContent.specializations) || [],
+    laboratory_rows: parseMaybeJson(specializationsContent.laboratory_rows) || [],
+  };
+}
+
+function normalizeSpecializationsPayload(payload) {
+  const nextPayload = { ...payload };
+
+  if (nextPayload.specializations !== undefined) {
+    nextPayload.specializations = JSON.stringify(nextPayload.specializations || []);
+  }
+
+  if (nextPayload.laboratory_rows !== undefined) {
+    nextPayload.laboratory_rows = JSON.stringify(nextPayload.laboratory_rows || []);
+  }
+
+  return nextPayload;
+}
+
 function sanitizeUploadCategory(rawCategory) {
   const normalized = String(rawCategory || "general")
     .toLowerCase()
@@ -596,6 +665,10 @@ router.get("/content", async (_req, res) => {
       "SELECT * FROM academics_content WHERE id = 1 LIMIT 1"
     );
 
+    const [specializationsContent] = await query(
+      "SELECT * FROM specializations_content WHERE id = 1 LIMIT 1"
+    );
+
     const navigation = await query(
       "SELECT id, label, href, sort_order, is_active FROM navigation_items ORDER BY sort_order ASC, id ASC"
     );
@@ -634,6 +707,7 @@ router.get("/content", async (_req, res) => {
       homeContent: homeContent || null,
       aboutContent: serializeAboutContent(aboutContent),
       academicsContent: serializeAcademicsContent(academicsContent),
+      specializationsContent: serializeSpecializationsContent(specializationsContent),
       navigation,
       socialLinks,
       footerLinks,
@@ -1012,6 +1086,90 @@ router.put("/academics-content", async (req, res) => {
       `UPDATE academics_content SET ${update.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
       update.values
     );
+
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/specializations-content", async (req, res) => {
+  const parsed = specializationsContentPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const allowedFields = [
+    "hero_title",
+    "hero_subtitle",
+    "specializations_tab_label",
+    "laboratories_tab_label",
+    "specializations_title",
+    "specializations_subtitle",
+    "specializations",
+    "laboratories_title",
+    "laboratory_rows",
+  ];
+
+  try {
+    const payload = normalizeSpecializationsPayload(parsed.data);
+    const update = buildUpdateClause(payload, allowedFields);
+    if (!update) {
+      return res.status(400).json({ error: "No valid fields to update" });
+    }
+
+    const [existingRow] = await query(
+      "SELECT id FROM specializations_content WHERE id = 1 LIMIT 1"
+    );
+
+    if (existingRow) {
+      await query(
+        `UPDATE specializations_content SET ${update.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 1`,
+        update.values
+      );
+    } else {
+      const insertPayload = {
+        hero_title: "Our Specializations",
+        hero_subtitle:
+          "Explore our five core areas of expertise and state-of-the-art laboratory facilities that drive innovation in civil engineering",
+        specializations_tab_label: "Specializations",
+        laboratories_tab_label: "Laboratories",
+        specializations_title: "Areas of Expertise",
+        specializations_subtitle:
+          "Each specialization offers unique opportunities for advanced learning and cutting-edge research",
+        specializations: "[]",
+        laboratories_title: "Laboratory Facilities",
+        laboratory_rows: "[]",
+        ...payload,
+      };
+
+      await query(
+        `INSERT INTO specializations_content (
+          id,
+          hero_title,
+          hero_subtitle,
+          specializations_tab_label,
+          laboratories_tab_label,
+          specializations_title,
+          specializations_subtitle,
+          specializations,
+          laboratories_title,
+          laboratory_rows
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          1,
+          insertPayload.hero_title,
+          insertPayload.hero_subtitle,
+          insertPayload.specializations_tab_label,
+          insertPayload.laboratories_tab_label,
+          insertPayload.specializations_title,
+          insertPayload.specializations_subtitle,
+          insertPayload.specializations,
+          insertPayload.laboratories_title,
+          insertPayload.laboratory_rows,
+        ]
+      );
+    }
 
     return res.json({ ok: true });
   } catch (error) {

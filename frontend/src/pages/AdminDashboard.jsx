@@ -24,6 +24,7 @@ import {
   updateHeroSlide,
   updateAcademicsContent,
   updateAboutContent,
+  updateSpecializationsContent,
   updateHomeContent,
   updateHomeStat,
   updateNavigationItem,
@@ -141,6 +142,52 @@ const defaultAcademicsContent = {
   admission_secondary_link: '',
 };
 
+const defaultSpecializationFaculty = {
+  name: '',
+  url: '',
+};
+
+const defaultSpecializationEquipment = {
+  name: '',
+  image_url: '',
+};
+
+const defaultSpecializationLab = {
+  name: '',
+  equipments: [],
+};
+
+const defaultSpecializationItem = {
+  key: '',
+  title: '',
+  description: '',
+  color: 'blue',
+  icon_name: 'Building',
+  image_url: '',
+  faculty: [],
+  labs: [],
+};
+
+const defaultSpecializationRow = {
+  name: '',
+  location: '',
+};
+
+const defaultSpecializationsContent = {
+  hero_title: '',
+  hero_subtitle: '',
+  specializations_tab_label: 'Specializations',
+  laboratories_tab_label: 'Laboratories',
+  specializations_title: '',
+  specializations_subtitle: '',
+  specializations: [],
+  laboratories_title: 'Department Laboratories',
+  laboratory_rows: [],
+};
+
+const specializationColorOptions = ['blue', 'amber', 'green', 'cyan', 'emerald'];
+const specializationIconOptions = ['Building', 'Microscope', 'Target', 'FlaskConical', 'Award'];
+
 const defaultNavigationItem = {
   label: '',
   href: '',
@@ -228,6 +275,7 @@ const adminSectionGroups = [
       { key: 'home-content', label: 'Home Content' },
       { key: 'about-content', label: 'About Content' },
       { key: 'academics-content', label: 'Academics Content' },
+      { key: 'specializations-content', label: 'Specializations Content' },
     ],
   },
   {
@@ -268,6 +316,10 @@ const sectionDetails = {
   'academics-content': {
     title: 'Academics Content',
     description: 'Programs, curriculum, facilities, and admission section for Academics page.',
+  },
+  'specializations-content': {
+    title: 'Specializations Content',
+    description: 'Specialization cards, faculty, lab equipment, and laboratories table.',
   },
   navigation: {
     title: 'Navigation Items',
@@ -349,6 +401,7 @@ const AdminDashboard = () => {
   const [homeContent, setHomeContent] = useState(defaultHomeContent);
   const [aboutContent, setAboutContent] = useState(defaultAboutContent);
   const [academicsContent, setAcademicsContent] = useState(defaultAcademicsContent);
+  const [specializationsContent, setSpecializationsContent] = useState(defaultSpecializationsContent);
   const [navigationItems, setNavigationItems] = useState([]);
   const [socialLinks, setSocialLinks] = useState([]);
   const [footerLinks, setFooterLinks] = useState([]);
@@ -372,6 +425,7 @@ const AdminDashboard = () => {
     const loadedHomeContent = data?.homeContent || {};
     const loadedAboutContent = data?.aboutContent || {};
     const loadedAcademicsContent = data?.academicsContent || {};
+    const loadedSpecializationsContent = data?.specializationsContent || {};
 
     setSiteSettings({
       ...defaultSiteSettings,
@@ -411,6 +465,17 @@ const AdminDashboard = () => {
         : [],
       facilities_items: Array.isArray(loadedAcademicsContent.facilities_items)
         ? loadedAcademicsContent.facilities_items
+        : [],
+    });
+
+    setSpecializationsContent({
+      ...defaultSpecializationsContent,
+      ...loadedSpecializationsContent,
+      specializations: Array.isArray(loadedSpecializationsContent.specializations)
+        ? loadedSpecializationsContent.specializations
+        : [],
+      laboratory_rows: Array.isArray(loadedSpecializationsContent.laboratory_rows)
+        ? loadedSpecializationsContent.laboratory_rows
         : [],
     });
 
@@ -754,6 +819,360 @@ const AdminDashboard = () => {
       curriculum_semesters: (
         Array.isArray(previous.curriculum_semesters) ? previous.curriculum_semesters : []
       ).filter((_item, currentIndex) => currentIndex !== index),
+    }));
+  };
+
+  const saveSpecializationsContent = () => {
+    const specializations = (
+      Array.isArray(specializationsContent.specializations)
+        ? specializationsContent.specializations
+        : []
+    )
+      .map((item) => ({
+        key: String(item?.key || '').trim().toLowerCase(),
+        title: String(item?.title || '').trim(),
+        description: String(item?.description || '').trim(),
+        color: String(item?.color || 'blue').trim().toLowerCase(),
+        icon_name: String(item?.icon_name || 'Building').trim(),
+        image_url: String(item?.image_url || '').trim(),
+        faculty: (Array.isArray(item?.faculty) ? item.faculty : [])
+          .map((faculty) => ({
+            name: String(faculty?.name || '').trim(),
+            url: String(faculty?.url || '').trim() || null,
+          }))
+          .filter((faculty) => faculty.name),
+        labs: (Array.isArray(item?.labs) ? item.labs : [])
+          .map((lab) => ({
+            name: String(lab?.name || '').trim(),
+            equipments: (Array.isArray(lab?.equipments) ? lab.equipments : [])
+              .map((equipment) => ({
+                name: String(equipment?.name || '').trim(),
+                image_url: String(equipment?.image_url || '').trim() || null,
+              }))
+              .filter((equipment) => equipment.name),
+          }))
+          .filter((lab) => lab.name),
+      }))
+      .filter((item) => item.key || item.title || item.description);
+
+    if (
+      specializations.some(
+        (item) =>
+          !item.key ||
+          !item.title ||
+          !item.description ||
+          !item.color ||
+          !item.icon_name ||
+          !item.image_url,
+      )
+    ) {
+      setError(
+        'Each specialization needs key, title, description, color, icon, and image URL, or remove the incomplete row.',
+      );
+      return;
+    }
+
+    if (
+      specializations.some((item) =>
+        item.labs.some((lab) => !lab.name || lab.equipments.some((equipment) => !equipment.name)),
+      )
+    ) {
+      setError('Each lab needs a name and each listed equipment needs a name.');
+      return;
+    }
+
+    const laboratoryRows = (
+      Array.isArray(specializationsContent.laboratory_rows)
+        ? specializationsContent.laboratory_rows
+        : []
+    )
+      .map((row) => ({
+        name: String(row?.name || '').trim(),
+        location: String(row?.location || '').trim(),
+      }))
+      .filter((row) => row.name || row.location);
+
+    if (laboratoryRows.some((row) => !row.name || !row.location)) {
+      setError('Each laboratory row needs both name and location, or remove the incomplete row.');
+      return;
+    }
+
+    const payload = {
+      ...specializationsContent,
+      specializations,
+      laboratory_rows: laboratoryRows,
+    };
+
+    delete payload.id;
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    runAction(
+      () => updateSpecializationsContent(payload),
+      'Specializations content updated successfully.',
+    );
+  };
+
+  const addSpecializationItem = () => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: [
+        ...(Array.isArray(previous.specializations) ? previous.specializations : []),
+        { ...defaultSpecializationItem },
+      ],
+    }));
+  };
+
+  const updateSpecializationItem = (index, nextItem) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) => (currentIndex === index ? { ...item, ...nextItem } : item)),
+    }));
+  };
+
+  const removeSpecializationItem = (index) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).filter((_item, currentIndex) => currentIndex !== index),
+    }));
+  };
+
+  const addSpecializationFaculty = (specializationIndex) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) =>
+        currentIndex === specializationIndex
+          ? {
+              ...item,
+              faculty: [...(Array.isArray(item.faculty) ? item.faculty : []), { ...defaultSpecializationFaculty }],
+            }
+          : item,
+      ),
+    }));
+  };
+
+  const updateSpecializationFaculty = (specializationIndex, facultyIndex, nextItem) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) => {
+        if (currentIndex !== specializationIndex) {
+          return item;
+        }
+
+        return {
+          ...item,
+          faculty: (Array.isArray(item.faculty) ? item.faculty : []).map((faculty, currentFacultyIndex) =>
+            currentFacultyIndex === facultyIndex ? { ...faculty, ...nextItem } : faculty,
+          ),
+        };
+      }),
+    }));
+  };
+
+  const removeSpecializationFaculty = (specializationIndex, facultyIndex) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) => {
+        if (currentIndex !== specializationIndex) {
+          return item;
+        }
+
+        return {
+          ...item,
+          faculty: (Array.isArray(item.faculty) ? item.faculty : []).filter(
+            (_faculty, currentFacultyIndex) => currentFacultyIndex !== facultyIndex,
+          ),
+        };
+      }),
+    }));
+  };
+
+  const addSpecializationLab = (specializationIndex) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) =>
+        currentIndex === specializationIndex
+          ? {
+              ...item,
+              labs: [...(Array.isArray(item.labs) ? item.labs : []), { ...defaultSpecializationLab }],
+            }
+          : item,
+      ),
+    }));
+  };
+
+  const updateSpecializationLab = (specializationIndex, labIndex, nextItem) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) => {
+        if (currentIndex !== specializationIndex) {
+          return item;
+        }
+
+        return {
+          ...item,
+          labs: (Array.isArray(item.labs) ? item.labs : []).map((lab, currentLabIndex) =>
+            currentLabIndex === labIndex ? { ...lab, ...nextItem } : lab,
+          ),
+        };
+      }),
+    }));
+  };
+
+  const removeSpecializationLab = (specializationIndex, labIndex) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) => {
+        if (currentIndex !== specializationIndex) {
+          return item;
+        }
+
+        return {
+          ...item,
+          labs: (Array.isArray(item.labs) ? item.labs : []).filter(
+            (_lab, currentLabIndex) => currentLabIndex !== labIndex,
+          ),
+        };
+      }),
+    }));
+  };
+
+  const addSpecializationEquipment = (specializationIndex, labIndex) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) => {
+        if (currentIndex !== specializationIndex) {
+          return item;
+        }
+
+        return {
+          ...item,
+          labs: (Array.isArray(item.labs) ? item.labs : []).map((lab, currentLabIndex) =>
+            currentLabIndex === labIndex
+              ? {
+                  ...lab,
+                  equipments: [
+                    ...(Array.isArray(lab.equipments) ? lab.equipments : []),
+                    { ...defaultSpecializationEquipment },
+                  ],
+                }
+              : lab,
+          ),
+        };
+      }),
+    }));
+  };
+
+  const updateSpecializationEquipment = (
+    specializationIndex,
+    labIndex,
+    equipmentIndex,
+    nextItem,
+  ) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) => {
+        if (currentIndex !== specializationIndex) {
+          return item;
+        }
+
+        return {
+          ...item,
+          labs: (Array.isArray(item.labs) ? item.labs : []).map((lab, currentLabIndex) => {
+            if (currentLabIndex !== labIndex) {
+              return lab;
+            }
+
+            return {
+              ...lab,
+              equipments: (Array.isArray(lab.equipments) ? lab.equipments : []).map(
+                (equipment, currentEquipmentIndex) =>
+                  currentEquipmentIndex === equipmentIndex
+                    ? { ...equipment, ...nextItem }
+                    : equipment,
+              ),
+            };
+          }),
+        };
+      }),
+    }));
+  };
+
+  const removeSpecializationEquipment = (specializationIndex, labIndex, equipmentIndex) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      specializations: (
+        Array.isArray(previous.specializations) ? previous.specializations : []
+      ).map((item, currentIndex) => {
+        if (currentIndex !== specializationIndex) {
+          return item;
+        }
+
+        return {
+          ...item,
+          labs: (Array.isArray(item.labs) ? item.labs : []).map((lab, currentLabIndex) => {
+            if (currentLabIndex !== labIndex) {
+              return lab;
+            }
+
+            return {
+              ...lab,
+              equipments: (Array.isArray(lab.equipments) ? lab.equipments : []).filter(
+                (_equipment, currentEquipmentIndex) =>
+                  currentEquipmentIndex !== equipmentIndex,
+              ),
+            };
+          }),
+        };
+      }),
+    }));
+  };
+
+  const addLaboratoryRow = () => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      laboratory_rows: [
+        ...(Array.isArray(previous.laboratory_rows) ? previous.laboratory_rows : []),
+        { ...defaultSpecializationRow },
+      ],
+    }));
+  };
+
+  const updateLaboratoryRow = (index, nextItem) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      laboratory_rows: (
+        Array.isArray(previous.laboratory_rows) ? previous.laboratory_rows : []
+      ).map((row, currentIndex) => (currentIndex === index ? { ...row, ...nextItem } : row)),
+    }));
+  };
+
+  const removeLaboratoryRow = (index) => {
+    setSpecializationsContent((previous) => ({
+      ...previous,
+      laboratory_rows: (
+        Array.isArray(previous.laboratory_rows) ? previous.laboratory_rows : []
+      ).filter((_row, currentIndex) => currentIndex !== index),
     }));
   };
 
@@ -2623,6 +3042,477 @@ const AdminDashboard = () => {
                   className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
                 >
                   Save Academics Content
+                </button>
+              </section>
+            )}
+
+            {activeSection === 'specializations-content' && (
+              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
+                <h2 className="text-xl font-semibold text-gray-900">Specializations Content</h2>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={specializationsContent.hero_title}
+                      onChange={(event) =>
+                        setSpecializationsContent((previous) => ({
+                          ...previous,
+                          hero_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Hero Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={specializationsContent.hero_subtitle}
+                      onChange={(event) =>
+                        setSpecializationsContent((previous) => ({
+                          ...previous,
+                          hero_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Specializations Tab Label
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={specializationsContent.specializations_tab_label}
+                      onChange={(event) =>
+                        setSpecializationsContent((previous) => ({
+                          ...previous,
+                          specializations_tab_label: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700">
+                    Laboratories Tab Label
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={specializationsContent.laboratories_tab_label}
+                      onChange={(event) =>
+                        setSpecializationsContent((previous) => ({
+                          ...previous,
+                          laboratories_tab_label: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Specializations Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={specializationsContent.specializations_title}
+                      onChange={(event) =>
+                        setSpecializationsContent((previous) => ({
+                          ...previous,
+                          specializations_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Specializations Section Subtitle
+                    <textarea
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
+                      value={specializationsContent.specializations_subtitle}
+                      onChange={(event) =>
+                        setSpecializationsContent((previous) => ({
+                          ...previous,
+                          specializations_subtitle: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label className="text-sm text-gray-700 md:col-span-2">
+                    Laboratories Section Title
+                    <input
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                      value={specializationsContent.laboratories_title}
+                      onChange={(event) =>
+                        setSpecializationsContent((previous) => ({
+                          ...previous,
+                          laboratories_title: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Specialization Cards</h3>
+                      <button
+                        type="button"
+                        onClick={addSpecializationItem}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Specialization
+                      </button>
+                    </div>
+
+                    {(Array.isArray(specializationsContent.specializations)
+                      ? specializationsContent.specializations
+                      : []
+                    ).map((item, index) => (
+                      <div key={`specialization-${index}`} className="rounded-lg border border-gray-200 p-3 space-y-3">
+                        <div className="grid md:grid-cols-12 gap-3">
+                          <label className="text-xs text-gray-700 md:col-span-2">
+                            Key
+                            <input
+                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                              value={item.key || ''}
+                              onChange={(event) =>
+                                updateSpecializationItem(index, {
+                                  key: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+
+                          <label className="text-xs text-gray-700 md:col-span-4">
+                            Title
+                            <input
+                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                              value={item.title || ''}
+                              onChange={(event) =>
+                                updateSpecializationItem(index, {
+                                  title: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+
+                          <label className="text-xs text-gray-700 md:col-span-2">
+                            Color
+                            <select
+                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                              value={item.color || 'blue'}
+                              onChange={(event) =>
+                                updateSpecializationItem(index, {
+                                  color: event.target.value,
+                                })
+                              }
+                            >
+                              {specializationColorOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="text-xs text-gray-700 md:col-span-2">
+                            Icon
+                            <select
+                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                              value={item.icon_name || 'Building'}
+                              onChange={(event) =>
+                                updateSpecializationItem(index, {
+                                  icon_name: event.target.value,
+                                })
+                              }
+                            >
+                              {specializationIconOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <div className="md:col-span-2 flex items-end">
+                            <button
+                              type="button"
+                              onClick={() => removeSpecializationItem(index)}
+                              className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          <label className="text-xs text-gray-700 md:col-span-8">
+                            Banner Image URL
+                            <input
+                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
+                              value={item.image_url || ''}
+                              onChange={(event) =>
+                                updateSpecializationItem(index, {
+                                  image_url: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+
+                          <label className="text-xs text-gray-700 md:col-span-4">
+                            Upload Banner Image
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="mt-1 block w-full text-xs"
+                              onChange={(event) =>
+                                uploadImage(event.target.files?.[0], 'specializations', (url) =>
+                                  updateSpecializationItem(index, {
+                                    image_url: url,
+                                  }),
+                                )
+                              }
+                            />
+                          </label>
+
+                          <label className="text-xs text-gray-700 md:col-span-12">
+                            Description
+                            <textarea
+                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm"
+                              value={item.description || ''}
+                              onChange={(event) =>
+                                updateSpecializationItem(index, {
+                                  description: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+
+                          <div className="md:col-span-12 rounded-lg border border-gray-200 p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-semibold text-gray-700">Faculty Members</h4>
+                              <button
+                                type="button"
+                                onClick={() => addSpecializationFaculty(index)}
+                                className="px-2 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs"
+                              >
+                                Add Faculty
+                              </button>
+                            </div>
+
+                            {(Array.isArray(item.faculty) ? item.faculty : []).map((faculty, facultyIndex) => (
+                              <div key={`specialization-faculty-${index}-${facultyIndex}`} className="grid md:grid-cols-12 gap-2">
+                                <input
+                                  className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
+                                  placeholder="Faculty Name"
+                                  value={faculty.name || ''}
+                                  onChange={(event) =>
+                                    updateSpecializationFaculty(index, facultyIndex, {
+                                      name: event.target.value,
+                                    })
+                                  }
+                                />
+                                <input
+                                  className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-6"
+                                  placeholder="Profile URL (optional)"
+                                  value={faculty.url || ''}
+                                  onChange={(event) =>
+                                    updateSpecializationFaculty(index, facultyIndex, {
+                                      url: event.target.value,
+                                    })
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeSpecializationFaculty(index, facultyIndex)}
+                                  className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-1"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="md:col-span-12 rounded-lg border border-gray-200 p-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-semibold text-gray-700">Laboratories and Equipment</h4>
+                              <button
+                                type="button"
+                                onClick={() => addSpecializationLab(index)}
+                                className="px-2 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs"
+                              >
+                                Add Lab
+                              </button>
+                            </div>
+
+                            {(Array.isArray(item.labs) ? item.labs : []).map((lab, labIndex) => (
+                              <div key={`specialization-lab-${index}-${labIndex}`} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                                <div className="grid md:grid-cols-12 gap-2">
+                                  <input
+                                    className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-10"
+                                    placeholder="Lab Name"
+                                    value={lab.name || ''}
+                                    onChange={(event) =>
+                                      updateSpecializationLab(index, labIndex, {
+                                        name: event.target.value,
+                                      })
+                                    }
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeSpecializationLab(index, labIndex)}
+                                    className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
+                                  >
+                                    Remove Lab
+                                  </button>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs font-semibold text-gray-700">Equipment List</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => addSpecializationEquipment(index, labIndex)}
+                                      className="px-2 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs"
+                                    >
+                                      Add Equipment
+                                    </button>
+                                  </div>
+
+                                  {(Array.isArray(lab.equipments) ? lab.equipments : []).map(
+                                    (equipment, equipmentIndex) => (
+                                      <div
+                                        key={`specialization-equipment-${index}-${labIndex}-${equipmentIndex}`}
+                                        className="grid md:grid-cols-12 gap-2"
+                                      >
+                                        <input
+                                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
+                                          placeholder="Equipment Name"
+                                          value={equipment.name || ''}
+                                          onChange={(event) =>
+                                            updateSpecializationEquipment(
+                                              index,
+                                              labIndex,
+                                              equipmentIndex,
+                                              {
+                                                name: event.target.value,
+                                              },
+                                            )
+                                          }
+                                        />
+                                        <input
+                                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
+                                          placeholder="Equipment Image URL"
+                                          value={equipment.image_url || ''}
+                                          onChange={(event) =>
+                                            updateSpecializationEquipment(
+                                              index,
+                                              labIndex,
+                                              equipmentIndex,
+                                              {
+                                                image_url: event.target.value,
+                                              },
+                                            )
+                                          }
+                                        />
+                                        <label className="text-xs text-gray-700 md:col-span-3">
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="block w-full text-xs"
+                                            onChange={(event) =>
+                                              uploadImage(
+                                                event.target.files?.[0],
+                                                'instruments',
+                                                (url) =>
+                                                  updateSpecializationEquipment(
+                                                    index,
+                                                    labIndex,
+                                                    equipmentIndex,
+                                                    {
+                                                      image_url: url,
+                                                    },
+                                                  ),
+                                              )
+                                            }
+                                          />
+                                        </label>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            removeSpecializationEquipment(
+                                              index,
+                                              labIndex,
+                                              equipmentIndex,
+                                            )
+                                          }
+                                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-1"
+                                        >
+                                          X
+                                        </button>
+                                      </div>
+                                    ),
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-800">Laboratories Table</h3>
+                      <button
+                        type="button"
+                        onClick={addLaboratoryRow}
+                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
+                      >
+                        Add Row
+                      </button>
+                    </div>
+
+                    {(Array.isArray(specializationsContent.laboratory_rows)
+                      ? specializationsContent.laboratory_rows
+                      : []
+                    ).map((row, index) => (
+                      <div key={`specialization-row-${index}`} className="grid md:grid-cols-12 gap-2">
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
+                          placeholder="Laboratory Name"
+                          value={row.name || ''}
+                          onChange={(event) =>
+                            updateLaboratoryRow(index, {
+                              name: event.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
+                          placeholder="Location"
+                          value={row.location || ''}
+                          onChange={(event) =>
+                            updateLaboratoryRow(index, {
+                              location: event.target.value,
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeLaboratoryRow(index)}
+                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveSpecializationsContent}
+                  disabled={isWorking}
+                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
+                >
+                  Save Specializations Content
                 </button>
               </section>
             )}

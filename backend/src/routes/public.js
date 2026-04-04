@@ -140,6 +140,31 @@ router.get("/academics", async (_req, res) => {
   }
 });
 
+router.get("/specializations", async (_req, res) => {
+  try {
+    const [specializationsContent] = await query(
+      "SELECT * FROM specializations_content WHERE id = 1 LIMIT 1"
+    );
+
+    if (!specializationsContent) {
+      return res.json({ specializationsContent: null });
+    }
+
+    return res.json({
+      specializationsContent: {
+        ...specializationsContent,
+        specializations: parseMaybeJson(specializationsContent.specializations) || [],
+        laboratory_rows: parseMaybeJson(specializationsContent.laboratory_rows) || [],
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch specializations content",
+      message: error.message,
+    });
+  }
+});
+
 router.get("/people", async (_req, res) => {
   try {
     const entries = await query(
