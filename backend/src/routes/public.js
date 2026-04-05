@@ -4,6 +4,45 @@ const { parseMaybeJson } = require("../utils/sql");
 
 const router = express.Router();
 
+const STUDENT_PLACEHOLDER_IMAGE_URL =
+  "/uploads/people/placeholders/student-default.jpg";
+const STUDENT_PLACEHOLDER_SVG_URL =
+  "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 480'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23f3f4f6'/%3E%3Cstop offset='100%25' stop-color='%23e5e7eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='480' height='480' fill='url(%23g)'/%3E%3Ccircle cx='240' cy='180' r='80' fill='%23cbd5e1'/%3E%3Cpath d='M100 420c20-90 80-140 140-140s120 50 140 140' fill='%23cbd5e1'/%3E%3C/svg%3E";
+const LEGACY_DEFAULT_STUDENT_IMAGE_URLS = new Set([
+  "/uploads/people/phd/aadarsh singh.jpg",
+  "/assets/stu_images/phd/aadarsh singh.jpg",
+]);
+
+function normalizeStudentImageUrl(category, name, imageUrl) {
+  if (category !== "phd") {
+    return imageUrl;
+  }
+
+  if (imageUrl == null) {
+    return STUDENT_PLACEHOLDER_IMAGE_URL;
+  }
+
+  const trimmedImageUrl = String(imageUrl).trim();
+  if (!trimmedImageUrl) {
+    return STUDENT_PLACEHOLDER_IMAGE_URL;
+  }
+
+  const normalizedImageUrl = trimmedImageUrl.toLowerCase();
+  const normalizedName = String(name || "").trim().toLowerCase();
+
+  if (
+    LEGACY_DEFAULT_STUDENT_IMAGE_URLS.has(normalizedImageUrl) &&
+    normalizedName !== "aadarsh singh"
+  ) {
+    return STUDENT_PLACEHOLDER_IMAGE_URL;
+  }
+
+  return String(trimmedImageUrl).toLowerCase() ===
+    STUDENT_PLACEHOLDER_IMAGE_URL.toLowerCase()
+    ? STUDENT_PLACEHOLDER_SVG_URL
+    : trimmedImageUrl;
+}
+
 function parseStringList(value) {
   const parsed = parseMaybeJson(value);
   if (!Array.isArray(parsed)) {
@@ -274,7 +313,11 @@ router.get("/people", async (_req, res) => {
           id: entry.id,
           name: entry.name,
           email: entry.email,
-          image: entry.image_url,
+          image: normalizeStudentImageUrl(
+            entry.category,
+            entry.name,
+            entry.image_url
+          ),
           sort_order: entry.sort_order,
         });
         return;

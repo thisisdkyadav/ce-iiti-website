@@ -646,9 +646,8 @@ const People = () => {
   const fallbackStaffImage = isBackendPeopleLoaded
     ? '/uploads/people/placeholders/staff-default.jpg'
     : '/assets/staff pics/Rinki.jpg';
-  const fallbackStudentImage = isBackendPeopleLoaded
-    ? '/uploads/people/placeholders/student-default.jpg'
-    : '/assets/stu_images/phd/Aadarsh Singh.jpg';
+  const fallbackStudentImage =
+    'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320"><rect width="320" height="320" fill="%23e5e7eb"/><circle cx="160" cy="118" r="52" fill="%239ca3af"/><rect x="84" y="196" width="152" height="88" rx="44" fill="%239ca3af"/></svg>';
 
   const specializations = ['All', ...new Set(currentRegularFaculty.map((f) => f.specialization).filter(Boolean))];
 
@@ -807,7 +806,7 @@ const People = () => {
     <div key={index} className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
       <div className="p-4">
         <img
-          src={resolveMediaUrl(student.image)}
+          src={resolveMediaUrl(student.image || fallbackStudentImage)}
           alt={student.name}
           className="w-full h-48 object-cover rounded-md mb-3 bg-gray-200"
           loading="lazy"

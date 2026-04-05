@@ -19,6 +19,59 @@ const { buildUpdateClause, parseMaybeJson } = require("../utils/sql");
 
 const router = express.Router();
 
+const STUDENT_PLACEHOLDER_IMAGE_URL =
+  "/uploads/people/placeholders/student-default.jpg";
+const STUDENT_PLACEHOLDER_SVG_URL =
+  "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 480'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%23f3f4f6'/%3E%3Cstop offset='100%25' stop-color='%23e5e7eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='480' height='480' fill='url(%23g)'/%3E%3Ccircle cx='240' cy='180' r='80' fill='%23cbd5e1'/%3E%3Cpath d='M100 420c20-90 80-140 140-140s120 50 140 140' fill='%23cbd5e1'/%3E%3C/svg%3E";
+const LEGACY_DEFAULT_STUDENT_IMAGE_URLS = new Set([
+  "/uploads/people/phd/aadarsh singh.jpg",
+  "/assets/stu_images/phd/aadarsh singh.jpg",
+]);
+
+function normalizeStudentImageUrlForStorage(category, name, imageUrl) {
+  if (category !== "phd") {
+    return imageUrl;
+  }
+
+  if (imageUrl == null) {
+    return STUDENT_PLACEHOLDER_IMAGE_URL;
+  }
+
+  const trimmedImageUrl = String(imageUrl).trim();
+  if (!trimmedImageUrl) {
+    return STUDENT_PLACEHOLDER_IMAGE_URL;
+  }
+
+  const normalizedImageUrl = trimmedImageUrl.toLowerCase();
+  const normalizedName = String(name || "").trim().toLowerCase();
+
+  if (
+    LEGACY_DEFAULT_STUDENT_IMAGE_URLS.has(normalizedImageUrl) &&
+    normalizedName !== "aadarsh singh"
+  ) {
+    return STUDENT_PLACEHOLDER_IMAGE_URL;
+  }
+
+  return trimmedImageUrl;
+}
+
+function normalizeStudentImageUrlForResponse(category, name, imageUrl) {
+  const normalizedImageUrl = normalizeStudentImageUrlForStorage(
+    category,
+    name,
+    imageUrl
+  );
+
+  if (category !== "phd") {
+    return normalizedImageUrl;
+  }
+
+  return String(normalizedImageUrl).toLowerCase() ===
+    STUDENT_PLACEHOLDER_IMAGE_URL.toLowerCase()
+    ? STUDENT_PLACEHOLDER_SVG_URL
+    : normalizedImageUrl;
+}
+
 const nonEmptyPatch = (shape) =>
   z
     .object(shape)
@@ -458,15 +511,38 @@ function parseStringList(value) {
 }
 
 function serializePeopleEntry(entry) {
+  const imageUrl = normalizeStudentImageUrlForResponse(
+    entry.category,
+    entry.name,
+    entry.image_url
+  );
+
   return {
     ...entry,
+    image_url: imageUrl,
     research_interests: parseStringList(entry.research_interests),
     responsibilities: parseStringList(entry.responsibilities),
   };
 }
 
-function normalizePeoplePayload(payload) {
+function normalizePeoplePayload(payload, existingCategory) {
   const nextPayload = { ...payload };
+  const hasImageField = Object.prototype.hasOwnProperty.call(
+    nextPayload,
+    "image_url"
+  );
+  const effectiveCategory = nextPayload.category ?? existingCategory;
+
+  if (
+    effectiveCategory === "phd" &&
+    (nextPayload.category === "phd" || hasImageField || !existingCategory)
+  ) {
+    nextPayload.image_url = normalizeStudentImageUrlForStorage(
+      "phd",
+      nextPayload.name,
+      nextPayload.image_url
+    );
+  }
 
   if (nextPayload.research_interests !== undefined) {
     nextPayload.research_interests =
@@ -1820,7 +1896,16 @@ router.patch("/people/:id", async (req, res) => {
   }
 
   try {
-    const payload = normalizePeoplePayload(parsed.data);
+    const [existingEntry] = await query(
+      "SELECT category FROM people_entries WHERE id = ? LIMIT 1",
+      [id]
+    );
+
+    if (!existingEntry) {
+      return res.status(404).json({ error: "People entry not found" });
+    }
+
+    const payload = normalizePeoplePayload(parsed.data, existingEntry.category);
     await patchRecordById("people_entries", id, payload, peopleEntryFields);
     return res.json({ ok: true });
   } catch (error) {
