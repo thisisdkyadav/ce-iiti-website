@@ -1869,6 +1869,29 @@ router.get("/people", async (_req, res) => {
   }
 });
 
+router.get("/contact-submissions", async (_req, res) => {
+  try {
+    const submissions = await query(
+      `SELECT
+        id,
+        full_name,
+        email,
+        subject,
+        category,
+        message,
+        ip_address,
+        user_agent,
+        created_at
+      FROM contact_form_submissions
+      ORDER BY created_at DESC, id DESC`
+    );
+
+    return res.json({ submissions });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 router.post("/people", async (req, res) => {
   const parsed = peopleEntryCreateSchema.safeParse(req.body);
   if (!parsed.success) {

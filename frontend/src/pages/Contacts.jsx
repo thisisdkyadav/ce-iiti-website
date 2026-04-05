@@ -13,6 +13,7 @@ import {
   fetchPublicContentByKey,
   getCachedPublicContentByKey,
   resolveMediaUrl,
+  submitContactForm,
 } from '../lib/contentApi';
 
 const ICON_MAP = {
@@ -226,6 +227,9 @@ const Contact = () => {
     category: fallbackContactContent.form_categories[0],
     message: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -262,16 +266,43 @@ const Contact = () => {
     });
   };
 
-  const handleSubmit = () => {
-    // Form currently provides UX feedback only.
-    alert(contactContent.form_submit_message || fallbackContactContent.form_submit_message);
-    setFormData({
-      name: '',
-      email: '',
-      subject: '',
-      category: contactContent.form_categories[0] || 'General Inquiry',
-      message: '',
-    });
+  const handleSubmit = async () => {
+    const payload = {
+      name: String(formData.name || '').trim(),
+      email: String(formData.email || '').trim(),
+      subject: String(formData.subject || '').trim(),
+      category: String(formData.category || '').trim(),
+      message: String(formData.message || '').trim(),
+    };
+
+    if (!payload.name || !payload.email || !payload.subject || !payload.message) {
+      setSubmitError('Please fill all required fields before submitting.');
+      setSubmitSuccess('');
+      return;
+    }
+
+    setSubmitError('');
+    setSubmitSuccess('');
+    setIsSubmitting(true);
+
+    try {
+      await submitContactForm(payload);
+
+      setSubmitSuccess(
+        contactContent.form_submit_message || fallbackContactContent.form_submit_message
+      );
+      setFormData({
+        name: '',
+        email: '',
+        subject: '',
+        category: contactContent.form_categories[0] || 'General Inquiry',
+        message: '',
+      });
+    } catch (error) {
+      setSubmitError(error.message || 'Failed to submit your message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -402,11 +433,24 @@ const Contact = () => {
 
                 <button
                   onClick={handleSubmit}
+                  disabled={isSubmitting}
                   className="w-full bg-blue-800 hover:bg-blue-900 text-white py-3 px-6 rounded-lg font-semibold transition-colors duration-200 flex items-center justify-center"
                 >
                   <Send className="h-5 w-5 mr-2" />
-                  Send Message
+                  {isSubmitting ? 'Sending...' : 'Send Message'}
                 </button>
+
+                {submitError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                    {submitError}
+                  </p>
+                )}
+
+                {submitSuccess && (
+                  <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                    {submitSuccess}
+                  </p>
+                )}
               </div>
             </div>
 

@@ -361,6 +361,17 @@ export function updateContactContent(payload) {
   });
 }
 
+export function fetchContactSubmissions() {
+  return adminRequest("/api/admin/contact-submissions");
+}
+
+export function submitContactForm(payload) {
+  return requestJson("/api/public/contact-submissions", {
+    method: "POST",
+    body: payload,
+  });
+}
+
 export function createHeroSlide(payload) {
   return adminRequest("/api/admin/home/hero-slides", {
     method: "POST",

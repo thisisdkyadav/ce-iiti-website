@@ -174,6 +174,20 @@ CREATE TABLE IF NOT EXISTS contact_content (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS contact_form_submissions (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  full_name VARCHAR(190) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  subject VARCHAR(255) NOT NULL,
+  category VARCHAR(120) NOT NULL,
+  message TEXT NOT NULL,
+  ip_address VARCHAR(64) NULL,
+  user_agent VARCHAR(255) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_contact_form_submissions_created_at (created_at),
+  INDEX idx_contact_form_submissions_email (email)
+);
+
 CREATE TABLE IF NOT EXISTS home_hero_slides (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   image_url VARCHAR(512) NOT NULL,

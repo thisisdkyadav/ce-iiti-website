@@ -17,6 +17,7 @@ import {
   deletePeopleEntry,
   deleteSocialLink,
   fetchAdminContent,
+  fetchContactSubmissions,
   fetchAdminSession,
   resolveMediaUrl,
   updatePeopleEntry,
@@ -490,6 +491,7 @@ const adminSectionGroups = [
       { key: 'about-content', label: 'About Content', icon: 'info' },
       { key: 'academics-content', label: 'Academics Content', icon: 'book' },
       { key: 'contact-content', label: 'Contact Content', icon: 'mail' },
+      { key: 'contact-submissions', label: 'Contact Responses', icon: 'mail' },
       { key: 'events-content', label: 'Events Content', icon: 'calendar' },
       { key: 'specializations-content', label: 'Specializations Content', icon: 'star' },
     ],
@@ -552,6 +554,10 @@ const sectionDetails = {
     title: 'Contact Content',
     description: 'Contact page sections, cards, categories, and key contact details.',
   },
+  'contact-submissions': {
+    title: 'Contact Responses',
+    description: 'View submitted contact form responses from website visitors.',
+  },
   'specializations-content': {
     title: 'Specializations Content',
     description: 'Specialization cards, faculty, lab equipment, and laboratories table.',
@@ -606,6 +612,19 @@ function formatDateTimeLocal(value) {
 
   const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return offsetDate.toISOString().slice(0, 16);
+}
+
+function formatReadableDateTime(value) {
+  if (!value) {
+    return '-';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  return date.toLocaleString();
 }
 
 function toIsoDateTime(value) {
@@ -853,6 +872,7 @@ const AdminDashboardContent = () => {
   const [stats, setStats] = useState([]);
   const [newsItems, setNewsItems] = useState([]);
   const [peopleEntries, setPeopleEntries] = useState([]);
+  const [contactSubmissions, setContactSubmissions] = useState([]);
   
   // People Directory Modal
   const [peopleModalOpen, setPeopleModalOpen] = useState(false);
@@ -868,6 +888,10 @@ const AdminDashboardContent = () => {
   const [programStudentDraft, setProgramStudentDraft] = useState(defaultProgramStudentDraft);
   const [programStudentConfirmDelete, setProgramStudentConfirmDelete] = useState(false);
   const [programStudentCsvInputKey, setProgramStudentCsvInputKey] = useState(0);
+
+  // Contact Form Responses Modal
+  const [contactSubmissionModalOpen, setContactSubmissionModalOpen] = useState(false);
+  const [contactSubmissionSelectedItem, setContactSubmissionSelectedItem] = useState(null);
 
   // About Content editing
   const [aboutEditMode, setAboutEditMode] = useState(false);
@@ -892,6 +916,33 @@ const AdminDashboardContent = () => {
   const clearMessages = () => {
     setError('');
     setSuccessMessage('');
+  };
+
+  const loadContactSubmissions = async ({ showError = false } = {}) => {
+    try {
+      const submissionsResponse = await fetchContactSubmissions();
+      setContactSubmissions(
+        Array.isArray(submissionsResponse?.submissions)
+          ? submissionsResponse.submissions
+          : []
+      );
+      return true;
+    } catch (submissionError) {
+      setContactSubmissions([]);
+      if (showError) {
+        setError(submissionError?.message || 'Failed to load contact submissions.');
+        setSuccessMessage('');
+      }
+      return false;
+    }
+  };
+
+  const refreshContactSubmissions = async () => {
+    clearMessages();
+    const success = await loadContactSubmissions({ showError: true });
+    if (success) {
+      setSuccessMessage('Contact submissions refreshed.');
+    }
   };
 
   const loadContent = async () => {
@@ -1011,6 +1062,8 @@ const AdminDashboardContent = () => {
         ? data.peopleEntries.map(normalizePeopleEntryForUi)
         : []
     );
+
+    await loadContactSubmissions();
   };
 
   useEffect(() => {
@@ -2365,6 +2418,16 @@ const AdminDashboardContent = () => {
       ...prev,
       [field]: (Array.isArray(prev[field]) ? prev[field] : []).filter((_, i) => i !== index),
     }));
+  };
+
+  const openContactSubmissionModal = (item) => {
+    setContactSubmissionSelectedItem(item);
+    setContactSubmissionModalOpen(true);
+  };
+
+  const closeContactSubmissionModal = () => {
+    setContactSubmissionModalOpen(false);
+    setContactSubmissionSelectedItem(null);
   };
 
   // ============================================
@@ -5022,6 +5085,149 @@ const AdminDashboardContent = () => {
                 </AdminCard>
 
                 <ConfirmationModal isOpen={academicsConfirmSave} onClose={() => setAcademicsConfirmSave(false)} onConfirm={saveAcademicsContent} title="Confirm Save" message="Save academics page content?" confirmText="Save" variant="info" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* Contact Responses Section */}
+            {activeSection === 'contact-submissions' && (
+              <>
+                <AdminCard>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                        Contact Form Responses
+                      </h2>
+                      <p className="text-sm mt-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        Click any row to view full response details.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <AdminButton variant="secondary" onClick={refreshContactSubmissions} disabled={isWorking}>
+                        Refresh
+                      </AdminButton>
+                    </div>
+                  </div>
+
+                  <div
+                    className="overflow-hidden rounded-lg"
+                    style={{ border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr
+                            style={{
+                              backgroundColor: isDark ? '#1f2937' : '#f9fafb',
+                              borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+                            }}
+                          >
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Name</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Email</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Category</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Subject</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Received</th>
+                          </tr>
+                        </thead>
+                        <tbody style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}>
+                          {contactSubmissions.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-10 text-center text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                                No contact responses submitted yet.
+                              </td>
+                            </tr>
+                          ) : (
+                            contactSubmissions.map((submission) => (
+                              <tr
+                                key={submission.id}
+                                role="button"
+                                tabIndex={0}
+                                className="cursor-pointer transition-colors"
+                                style={{ borderTop: `1px solid ${isDark ? '#1f2937' : '#f3f4f6'}` }}
+                                onClick={() => openContactSubmissionModal(submission)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    openContactSubmissionModal(submission);
+                                  }
+                                }}
+                                onMouseEnter={(event) => {
+                                  event.currentTarget.style.backgroundColor = isDark ? '#1f2937' : '#f9fafb';
+                                }}
+                                onMouseLeave={(event) => {
+                                  event.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <td className="py-3 px-4 text-sm font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{submission.full_name || '-'}</td>
+                                <td className="py-3 px-4 text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{submission.email || '-'}</td>
+                                <td className="py-3 px-4 text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{submission.category || '-'}</td>
+                                <td className="py-3 px-4 text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{submission.subject || '-'}</td>
+                                <td className="py-3 px-4 text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{formatReadableDateTime(submission.created_at)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </AdminCard>
+
+                <AdminModal
+                  isOpen={contactSubmissionModalOpen}
+                  onClose={closeContactSubmissionModal}
+                  title="Contact Response Details"
+                  size="lg"
+                  footer={
+                    <div className="flex justify-end gap-3">
+                      <AdminButton variant="secondary" onClick={closeContactSubmissionModal}>Close</AdminButton>
+                    </div>
+                  }
+                >
+                  {contactSubmissionSelectedItem && (
+                    <div className="space-y-5">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Name</p>
+                          <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{contactSubmissionSelectedItem.full_name || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Email</p>
+                          <p className="text-sm break-all" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{contactSubmissionSelectedItem.email || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Category</p>
+                          <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{contactSubmissionSelectedItem.category || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Received</p>
+                          <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{formatReadableDateTime(contactSubmissionSelectedItem.created_at)}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Subject</p>
+                        <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{contactSubmissionSelectedItem.subject || '-'}</p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Message</p>
+                        <div className="p-3 rounded-lg text-sm whitespace-pre-wrap" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`, color: isDark ? '#d1d5db' : '#374151' }}>
+                          {contactSubmissionSelectedItem.message || '-'}
+                        </div>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>IP Address</p>
+                          <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{contactSubmissionSelectedItem.ip_address || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>User Agent</p>
+                          <p className="text-sm break-words" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{contactSubmissionSelectedItem.user_agent || '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </AdminModal>
               </>
             )}
 

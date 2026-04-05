@@ -1,4 +1,5 @@
 const express = require("express");
+const { z } = require("zod");
 const { query } = require("../db");
 const { parseMaybeJson } = require("../utils/sql");
 
@@ -12,6 +13,14 @@ const LEGACY_DEFAULT_STUDENT_IMAGE_URLS = new Set([
   "/uploads/people/phd/aadarsh singh.jpg",
   "/assets/stu_images/phd/aadarsh singh.jpg",
 ]);
+
+const contactFormSubmissionSchema = z.object({
+  name: z.string().trim().min(1).max(190),
+  email: z.string().trim().email().max(255),
+  subject: z.string().trim().min(1).max(255),
+  category: z.string().trim().min(1).max(120),
+  message: z.string().trim().min(1).max(5000),
+});
 
 function normalizeStudentImageUrl(category, name, imageUrl) {
   if (category !== "phd") {
@@ -289,6 +298,41 @@ router.get("/contact", async (_req, res) => {
   } catch (error) {
     return res.status(500).json({
       error: "Failed to fetch contact content",
+      message: error.message,
+    });
+  }
+});
+
+router.post("/contact-submissions", async (req, res) => {
+  const parsed = contactFormSubmissionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const payload = parsed.data;
+  const ipAddress = String(req.ip || "").slice(0, 64) || null;
+  const userAgent = String(req.get("user-agent") || "").slice(0, 255) || null;
+
+  try {
+    await query(
+      `INSERT INTO contact_form_submissions
+        (full_name, email, subject, category, message, ip_address, user_agent)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        payload.name,
+        payload.email,
+        payload.subject,
+        payload.category,
+        payload.message,
+        ipAddress,
+        userAgent,
+      ]
+    );
+
+    return res.status(201).json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to submit contact form",
       message: error.message,
     });
   }
