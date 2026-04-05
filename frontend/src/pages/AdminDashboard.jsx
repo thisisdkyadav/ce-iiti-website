@@ -1007,7 +1007,7 @@ const AdminDashboardContent = () => {
     );
   };
 
-  const saveAboutContent = () => {
+  const saveAboutContent = async () => {
     const valuesItems = (Array.isArray(aboutContent.values_items) ? aboutContent.values_items : [])
       .map((item) => ({
         icon_name: item?.icon_name || 'Award',
@@ -1057,10 +1057,15 @@ const AdminDashboardContent = () => {
     delete payload.created_at;
     delete payload.updated_at;
 
-    runAction(
+    const success = await runAction(
       () => updateAboutContent(payload),
       'About content updated successfully.'
     );
+
+    if (success) {
+      setAboutConfirmSave(false);
+      setAboutEditMode(false);
+    }
   };
 
   const addAboutListItem = (field, itemTemplate) => {
@@ -1097,7 +1102,7 @@ const AdminDashboardContent = () => {
   const formatMultilineList = (list) =>
     (Array.isArray(list) ? list : []).map((item) => String(item || '').trim()).filter(Boolean).join('\n');
 
-  const saveAcademicsContent = () => {
+  const saveAcademicsContent = async () => {
     const programs = (Array.isArray(academicsContent.programs) ? academicsContent.programs : [])
       .map((program) => ({
         title: String(program?.title || '').trim(),
@@ -1156,10 +1161,15 @@ const AdminDashboardContent = () => {
     delete payload.created_at;
     delete payload.updated_at;
 
-    runAction(
+    const success = await runAction(
       () => updateAcademicsContent(payload),
       'Academics content updated successfully.'
     );
+
+    if (success) {
+      setAcademicsConfirmSave(false);
+      setAcademicsEditMode(false);
+    }
   };
 
   const addAcademicsProgram = () => {
