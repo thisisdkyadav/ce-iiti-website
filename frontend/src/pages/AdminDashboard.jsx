@@ -1575,31 +1575,47 @@ const AdminDashboardContent = () => {
     setNewsConfirmDelete(false);
   };
 
+  const getNewsValidationError = (draft) => {
+    const title = String(draft?.title || '').trim();
+    const excerpt = String(draft?.excerpt || '').trim();
+    const imageUrl = String(draft?.image_url || '').trim();
+    const publishDateIso = toIsoDateTime(draft?.publish_date);
+
+    if (!title) {
+      return 'News title is required.';
+    }
+
+    if (!excerpt) {
+      return 'News excerpt is required.';
+    }
+
+    if (!publishDateIso) {
+      return 'Please provide a valid publish date and time.';
+    }
+
+    if (!imageUrl) {
+      return 'News image is required. Please upload an image or add an image URL.';
+    }
+
+    return '';
+  };
+
+  const newsDraftValidationError = getNewsValidationError(newsDraft);
+
   const saveNewsItemEntry = async () => {
     setNewsConfirmSave(false);
+
+    const validationError = getNewsValidationError(newsDraft);
+    if (validationError) {
+      setError(validationError);
+      setSuccessMessage('');
+      return;
+    }
 
     const title = String(newsDraft.title || '').trim();
     const excerpt = String(newsDraft.excerpt || '').trim();
     const category = String(newsDraft.category || 'News').trim() || 'News';
     const publishDateIso = toIsoDateTime(newsDraft.publish_date);
-
-    if (!title) {
-      setError('News title is required.');
-      setSuccessMessage('');
-      return;
-    }
-
-    if (!excerpt) {
-      setError('News excerpt is required.');
-      setSuccessMessage('');
-      return;
-    }
-
-    if (!publishDateIso) {
-      setError('Please provide a valid publish date and time.');
-      setSuccessMessage('');
-      return;
-    }
 
     const payload = {
       title,
@@ -3741,7 +3757,15 @@ const AdminDashboardContent = () => {
                       <div>{newsSelectedItem && !newsEditMode && <AdminButton variant="danger" onClick={() => setNewsConfirmDelete(true)}>Delete</AdminButton>}</div>
                       <div className="flex gap-3">
                         {newsEditMode ? (
-                          <><AdminButton variant="secondary" onClick={closeNewsModal} disabled={isWorking}>Cancel</AdminButton><AdminButton variant="primary" onClick={() => setNewsConfirmSave(true)} loading={isWorking}>Save</AdminButton></>
+                          <><AdminButton variant="secondary" onClick={closeNewsModal} disabled={isWorking}>Cancel</AdminButton><AdminButton variant="primary" onClick={() => {
+                            if (newsDraftValidationError) {
+                              setError(newsDraftValidationError);
+                              setSuccessMessage('');
+                              return;
+                            }
+
+                            setNewsConfirmSave(true);
+                          }} loading={isWorking} disabled={isWorking || Boolean(newsDraftValidationError)}>Save</AdminButton></>
                         ) : (
                           <><AdminButton variant="warning" onClick={() => setNewsEditMode(true)}>Edit</AdminButton><AdminButton variant="secondary" onClick={closeNewsModal}>Close</AdminButton></>
                         )}
@@ -3751,14 +3775,14 @@ const AdminDashboardContent = () => {
                 >
                   {newsEditMode ? (
                     <div className="space-y-4">
-                      <AdminInput label="Title" value={newsDraft.title} onChange={(e) => setNewsDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="News title" />
-                      <AdminTextarea label="Excerpt" value={newsDraft.excerpt} onChange={(e) => setNewsDraft((prev) => ({ ...prev, excerpt: e.target.value }))} placeholder="Brief description" rows={3} />
+                      <AdminInput label="Title" required value={newsDraft.title} onChange={(e) => setNewsDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="News title" />
+                      <AdminTextarea label="Excerpt" required value={newsDraft.excerpt} onChange={(e) => setNewsDraft((prev) => ({ ...prev, excerpt: e.target.value }))} placeholder="Brief description" rows={3} />
                       <div className="grid md:grid-cols-2 gap-4">
                         <AdminInput label="Category" value={newsDraft.category} onChange={(e) => setNewsDraft((prev) => ({ ...prev, category: e.target.value }))} placeholder="e.g., News, Event" />
-                        <AdminInput label="Publish Date" type="datetime-local" value={newsDraft.publish_date} onChange={(e) => setNewsDraft((prev) => ({ ...prev, publish_date: e.target.value }))} />
+                        <AdminInput label="Publish Date" required type="datetime-local" value={newsDraft.publish_date} onChange={(e) => setNewsDraft((prev) => ({ ...prev, publish_date: e.target.value }))} />
                       </div>
                       <div className="space-y-2">
-                        <AdminInput label="Image URL" value={newsDraft.image_url} onChange={(e) => setNewsDraft((prev) => ({ ...prev, image_url: e.target.value }))} placeholder="Image URL" />
+                        <AdminInput label="Image URL" required value={newsDraft.image_url} onChange={(e) => setNewsDraft((prev) => ({ ...prev, image_url: e.target.value }))} placeholder="Image URL" helpText="Required: this item will not save without an image." />
                         <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files?.[0], 'news', (url) => setNewsDraft((prev) => ({ ...prev, image_url: url })))} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer" style={{ color: isDark ? '#9ca3af' : '#4b5563' }} />
                       </div>
                       <AdminInput label="External Link" value={newsDraft.external_link} onChange={(e) => setNewsDraft((prev) => ({ ...prev, external_link: e.target.value }))} placeholder="https://..." />

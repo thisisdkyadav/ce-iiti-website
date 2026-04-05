@@ -258,6 +258,21 @@ const contactContentPatchSchema = nonEmptyPatch({
   map_embed_url: z.string().min(1),
 });
 
+function toMySqlDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const pad = (num) => String(num).padStart(2, "0");
+
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(
+    date.getUTCDate()
+  )} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(
+    date.getUTCSeconds()
+  )}`;
+}
+
 const navigationItemCreateSchema = z.object({
   label: z.string().min(1),
   href: z.string().min(1),
@@ -1688,8 +1703,17 @@ router.post("/news", async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
+  const payload = {
+    ...parsed.data,
+    publish_date: toMySqlDateTime(parsed.data.publish_date),
+  };
+
+  if (!payload.publish_date) {
+    return res.status(400).json({ error: "Invalid publish date" });
+  }
+
   try {
-    const id = await insertRecord("news_items", parsed.data, [
+    const id = await insertRecord("news_items", payload, [
       "title",
       "excerpt",
       "category",
@@ -1715,8 +1739,18 @@ router.patch("/news/:id", async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
+  const payload = { ...parsed.data };
+  if (Object.prototype.hasOwnProperty.call(payload, "publish_date")) {
+    const normalizedPublishDate = toMySqlDateTime(payload.publish_date);
+    if (!normalizedPublishDate) {
+      return res.status(400).json({ error: "Invalid publish date" });
+    }
+
+    payload.publish_date = normalizedPublishDate;
+  }
+
   try {
-    await patchRecordById("news_items", id, parsed.data, [
+    await patchRecordById("news_items", id, payload, [
       "title",
       "excerpt",
       "category",
