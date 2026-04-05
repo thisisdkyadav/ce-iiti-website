@@ -12,7 +12,7 @@ import {
   deleteFooterLink,
   deleteHeroSlide,
   deleteHomeStat,
-  deleteNavigationItem,
+  deleteNavigationItem as deleteNavigationItemApi,
   deleteNewsItem,
   deletePeopleEntry,
   deleteSocialLink,
@@ -35,7 +35,13 @@ import {
   updateSocialLink,
   uploadAdminImage,
 } from '../lib/contentApi';
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
+import { AdminModal, AdminButton, AdminInput, AdminTextarea, AdminCard, ConfirmationModal } from '../components/admin';
 import './admin.css';
+
+// ============================================
+// DEFAULT VALUES AND CONSTANTS (unchanged)
+// ============================================
 
 const defaultSiteSettings = {
   site_name: '',
@@ -352,35 +358,55 @@ const peopleCategoryOptions = [
 const adminSectionGroups = [
   {
     label: 'Global',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
     sections: [
-      { key: 'site-settings', label: 'Site Settings' },
-      { key: 'home-content', label: 'Home Content' },
-      { key: 'about-content', label: 'About Content' },
-      { key: 'academics-content', label: 'Academics Content' },
-      { key: 'contact-content', label: 'Contact Content' },
-      { key: 'events-content', label: 'Events Content' },
-      { key: 'specializations-content', label: 'Specializations Content' },
+      { key: 'site-settings', label: 'Site Settings', icon: 'settings' },
+      { key: 'home-content', label: 'Home Content', icon: 'home' },
+      { key: 'about-content', label: 'About Content', icon: 'info' },
+      { key: 'academics-content', label: 'Academics Content', icon: 'book' },
+      { key: 'contact-content', label: 'Contact Content', icon: 'mail' },
+      { key: 'events-content', label: 'Events Content', icon: 'calendar' },
+      { key: 'specializations-content', label: 'Specializations Content', icon: 'star' },
     ],
   },
   {
     label: 'Header & Footer',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+      </svg>
+    ),
     sections: [
-      { key: 'navigation', label: 'Navigation Items' },
-      { key: 'social', label: 'Social Links' },
-      { key: 'footer', label: 'Footer Links' },
+      { key: 'navigation', label: 'Navigation Items', icon: 'menu' },
+      { key: 'social', label: 'Social Links', icon: 'share' },
+      { key: 'footer', label: 'Footer Links', icon: 'link' },
     ],
   },
   {
     label: 'Homepage Modules',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
     sections: [
-      { key: 'slides', label: 'Hero Slides' },
-      { key: 'stats', label: 'Home Stats' },
-      { key: 'news', label: 'News Items' },
+      { key: 'slides', label: 'Hero Slides', icon: 'image' },
+      { key: 'stats', label: 'Home Stats', icon: 'chart' },
+      { key: 'news', label: 'News Items', icon: 'newspaper' },
     ],
   },
   {
     label: 'People',
-    sections: [{ key: 'people', label: 'People Directory' }],
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    ),
+    sections: [{ key: 'people', label: 'People Directory', icon: 'users' }],
   },
 ];
 
@@ -443,6 +469,10 @@ const sectionDetails = {
   },
 };
 
+// ============================================
+// UTILITY FUNCTIONS (unchanged)
+// ============================================
+
 function formatDateTimeLocal(value) {
   if (!value) {
     return '';
@@ -479,8 +509,149 @@ function toInteger(value, fallback = 0) {
   return Math.trunc(parsed);
 }
 
-const AdminDashboard = () => {
+function toNullableString(value) {
+  const nextValue = String(value || '').trim();
+  return nextValue.length > 0 ? nextValue : null;
+}
+
+function toStringArrayFromText(value) {
+  return String(value || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function normalizePeopleEntryForUi(entry) {
+  const researchInterests = Array.isArray(entry?.research_interests)
+    ? entry.research_interests
+    : [];
+  const responsibilities = Array.isArray(entry?.responsibilities)
+    ? entry.responsibilities
+    : [];
+
+  return {
+    ...entry,
+    research_interests_text: researchInterests.join('\n'),
+    responsibilities_text: responsibilities.join('\n'),
+  };
+}
+
+function toPeopleDraft(entry) {
+  const normalized = normalizePeopleEntryForUi(entry || {});
+
+  return {
+    ...defaultPeopleEntry,
+    category: normalized.category || 'faculty',
+    name: normalized.name || '',
+    designation: normalized.designation || '',
+    specialization: normalized.specialization || '',
+    department: normalized.department || '',
+    year_label: normalized.year_label || '',
+    email: normalized.email || '',
+    phone: normalized.phone || '',
+    room: normalized.room || '',
+    profile_url: normalized.profile_url || '',
+    image_url: normalized.image_url || '',
+    resource_link: normalized.resource_link || '',
+    research_interests_text: normalized.research_interests_text || '',
+    responsibilities_text: normalized.responsibilities_text || '',
+    sort_order: toInteger(normalized.sort_order, 0),
+    is_active: normalized.is_active ? 1 : 0,
+  };
+}
+
+// ============================================
+// ICONS COMPONENT
+// ============================================
+
+const SectionIcon = ({ name, className = "w-5 h-5" }) => {
+  const icons = {
+    settings: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    home: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+    ),
+    info: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    book: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    ),
+    mail: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+    ),
+    calendar: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+    star: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+      </svg>
+    ),
+    menu: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    ),
+    share: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+      </svg>
+    ),
+    link: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    ),
+    image: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+    chart: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+    ),
+    newspaper: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+      </svg>
+    ),
+    users: (
+      <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    ),
+  };
+  
+  return icons[name] || icons.settings;
+};
+
+// ============================================
+// ADMIN DASHBOARD CONTENT COMPONENT
+// ============================================
+
+const AdminDashboardContent = () => {
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
+  
+  // Helper for theme-based styling
+  const isDark = theme === 'dark';
 
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -488,6 +659,64 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [activeSection, setActiveSection] = useState('site-settings');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Site Settings Modal
+  const [siteSettingsModalOpen, setSiteSettingsModalOpen] = useState(false);
+  const [siteSettingsEditMode, setSiteSettingsEditMode] = useState(false);
+  const [siteSettingsConfirmSave, setSiteSettingsConfirmSave] = useState(false);
+
+  // Navigation Items Modal
+  const [navModalOpen, setNavModalOpen] = useState(false);
+  const [navEditMode, setNavEditMode] = useState(false);
+  const [navSelectedItem, setNavSelectedItem] = useState(null);
+  const [navDraft, setNavDraft] = useState(defaultNavigationItem);
+  const [navConfirmSave, setNavConfirmSave] = useState(false);
+  const [navConfirmDelete, setNavConfirmDelete] = useState(false);
+
+  // Social Links Modal
+  const [socialModalOpen, setSocialModalOpen] = useState(false);
+  const [socialEditMode, setSocialEditMode] = useState(false);
+  const [socialSelectedItem, setSocialSelectedItem] = useState(null);
+  const [socialDraft, setSocialDraft] = useState(defaultSocialLink);
+  const [socialConfirmSave, setSocialConfirmSave] = useState(false);
+  const [socialConfirmDelete, setSocialConfirmDelete] = useState(false);
+
+  // Footer Links Modal
+  const [footerModalOpen, setFooterModalOpen] = useState(false);
+  const [footerEditMode, setFooterEditMode] = useState(false);
+  const [footerSelectedItem, setFooterSelectedItem] = useState(null);
+  const [footerDraft, setFooterDraft] = useState(defaultFooterLink);
+  const [footerConfirmSave, setFooterConfirmSave] = useState(false);
+  const [footerConfirmDelete, setFooterConfirmDelete] = useState(false);
+
+  // Hero Slides Modal
+  const [slideModalOpen, setSlideModalOpen] = useState(false);
+  const [slideEditMode, setSlideEditMode] = useState(false);
+  const [slideSelectedItem, setSlideSelectedItem] = useState(null);
+  const [slideDraft, setSlideDraft] = useState(defaultSlide);
+  const [slideConfirmSave, setSlideConfirmSave] = useState(false);
+  const [slideConfirmDelete, setSlideConfirmDelete] = useState(false);
+
+  // Home Stats Modal
+  const [statModalOpen, setStatModalOpen] = useState(false);
+  const [statEditMode, setStatEditMode] = useState(false);
+  const [statSelectedItem, setStatSelectedItem] = useState(null);
+  const [statDraft, setStatDraft] = useState(defaultStat);
+  const [statConfirmSave, setStatConfirmSave] = useState(false);
+  const [statConfirmDelete, setStatConfirmDelete] = useState(false);
+
+  // News Items Modal
+  const [newsModalOpen, setNewsModalOpen] = useState(false);
+  const [newsEditMode, setNewsEditMode] = useState(false);
+  const [newsSelectedItem, setNewsSelectedItem] = useState(null);
+  const [newsDraft, setNewsDraft] = useState(defaultNewsItem);
+  const [newsConfirmSave, setNewsConfirmSave] = useState(false);
+  const [newsConfirmDelete, setNewsConfirmDelete] = useState(false);
+
+  // Home Content Modal
+  const [homeContentEditMode, setHomeContentEditMode] = useState(false);
+  const [homeContentConfirmSave, setHomeContentConfirmSave] = useState(false);
 
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const [homeContent, setHomeContent] = useState(defaultHomeContent);
@@ -503,9 +732,35 @@ const AdminDashboard = () => {
   const [stats, setStats] = useState([]);
   const [newsItems, setNewsItems] = useState([]);
   const [peopleEntries, setPeopleEntries] = useState([]);
-  const [isPeopleModalOpen, setIsPeopleModalOpen] = useState(false);
-  const [editingPeopleId, setEditingPeopleId] = useState(null);
+  
+  // People Directory Modal
+  const [peopleModalOpen, setPeopleModalOpen] = useState(false);
+  const [peopleEditMode, setPeopleEditMode] = useState(false);
+  const [peopleSelectedItem, setPeopleSelectedItem] = useState(null);
   const [peopleDraft, setPeopleDraft] = useState(defaultPeopleEntry);
+  const [peopleConfirmSave, setPeopleConfirmSave] = useState(false);
+  const [peopleConfirmDelete, setPeopleConfirmDelete] = useState(false);
+  const [peopleFilterCategory, setPeopleFilterCategory] = useState('all');
+
+  // About Content editing
+  const [aboutEditMode, setAboutEditMode] = useState(false);
+  const [aboutConfirmSave, setAboutConfirmSave] = useState(false);
+
+  // Academics Content editing
+  const [academicsEditMode, setAcademicsEditMode] = useState(false);
+  const [academicsConfirmSave, setAcademicsConfirmSave] = useState(false);
+
+  // Contact Content editing
+  const [contactEditMode, setContactEditMode] = useState(false);
+  const [contactConfirmSave, setContactConfirmSave] = useState(false);
+
+  // Events Content editing
+  const [eventsEditMode, setEventsEditMode] = useState(false);
+  const [eventsConfirmSave, setEventsConfirmSave] = useState(false);
+
+  // Specializations Content editing
+  const [specializationsEditMode, setSpecializationsEditMode] = useState(false);
+  const [specializationsConfirmSave, setSpecializationsConfirmSave] = useState(false);
 
   const clearMessages = () => {
     setError('');
@@ -624,7 +879,11 @@ const AdminDashboard = () => {
         : []
     );
 
-    setPeopleEntries(Array.isArray(data?.peopleEntries) ? data.peopleEntries : []);
+    setPeopleEntries(
+      Array.isArray(data?.peopleEntries)
+        ? data.peopleEntries.map(normalizePeopleEntryForUi)
+        : []
+    );
   };
 
   useEffect(() => {
@@ -724,7 +983,13 @@ const AdminDashboard = () => {
     runAction(
       () => updateSiteSettings(payload),
       'Site settings updated successfully.'
-    );
+    ).then((success) => {
+      if (success) {
+        setSiteSettingsEditMode(false);
+        setSiteSettingsModalOpen(false);
+        setSiteSettingsConfirmSave(false);
+      }
+    });
   };
 
   const saveHomeContent = () => {
@@ -952,848 +1217,436 @@ const AdminDashboard = () => {
     }));
   };
 
-  const saveSpecializationsContent = () => {
-    const specializations = (
-      Array.isArray(specializationsContent.specializations)
-        ? specializationsContent.specializations
-        : []
-    )
-      .map((item) => ({
-        key: String(item?.key || '').trim().toLowerCase(),
-        title: String(item?.title || '').trim(),
-        description: String(item?.description || '').trim(),
-        color: String(item?.color || 'blue').trim().toLowerCase(),
-        icon_name: String(item?.icon_name || 'Building').trim(),
-        image_url: String(item?.image_url || '').trim(),
-        faculty: (Array.isArray(item?.faculty) ? item.faculty : [])
-          .map((faculty) => ({
-            name: String(faculty?.name || '').trim(),
-            url: String(faculty?.url || '').trim() || null,
-          }))
-          .filter((faculty) => faculty.name),
-        labs: (Array.isArray(item?.labs) ? item.labs : [])
-          .map((lab) => ({
-            name: String(lab?.name || '').trim(),
-            equipments: (Array.isArray(lab?.equipments) ? lab.equipments : [])
-              .map((equipment) => ({
-                name: String(equipment?.name || '').trim(),
-                image_url: String(equipment?.image_url || '').trim() || null,
-              }))
-              .filter((equipment) => equipment.name),
-          }))
-          .filter((lab) => lab.name),
-      }))
-      .filter((item) => item.key || item.title || item.description);
+  // ============================================
+  // NAVIGATION ITEMS HANDLERS
+  // ============================================
 
-    if (
-      specializations.some(
-        (item) =>
-          !item.key ||
-          !item.title ||
-          !item.description ||
-          !item.color ||
-          !item.icon_name ||
-          !item.image_url,
-      )
-    ) {
-      setError(
-        'Each specialization needs key, title, description, color, icon, and image URL, or remove the incomplete row.',
+  const openNavView = (item) => {
+    setNavSelectedItem(item);
+    setNavDraft({ ...item });
+    setNavEditMode(false);
+    setNavModalOpen(true);
+  };
+
+  const openNavCreate = () => {
+    setNavSelectedItem(null);
+    setNavDraft({ ...defaultNavigationItem, sort_order: navigationItems.length });
+    setNavEditMode(true);
+    setNavModalOpen(true);
+  };
+
+  const closeNavModal = () => {
+    setNavModalOpen(false);
+    setNavSelectedItem(null);
+    setNavEditMode(false);
+  };
+
+  const saveNavigationItem = async () => {
+    const payload = {
+      label: navDraft.label,
+      href: navDraft.href,
+      sort_order: toInteger(navDraft.sort_order, 0),
+      is_active: navDraft.is_active ? 1 : 0,
+    };
+
+    let success;
+    if (navSelectedItem?.id) {
+      success = await runAction(
+        () => updateNavigationItem(navSelectedItem.id, payload),
+        'Navigation item updated successfully.'
       );
-      return;
+    } else {
+      success = await runAction(
+        () => createNavigationItem(payload),
+        'Navigation item created successfully.'
+      );
     }
 
-    if (
-      specializations.some((item) =>
-        item.labs.some((lab) => !lab.name || lab.equipments.some((equipment) => !equipment.name)),
-      )
-    ) {
-      setError('Each lab needs a name and each listed equipment needs a name.');
-      return;
+    if (success) {
+      setNavConfirmSave(false);
+      closeNavModal();
     }
+  };
 
-    const laboratoryRows = (
-      Array.isArray(specializationsContent.laboratory_rows)
-        ? specializationsContent.laboratory_rows
-        : []
-    )
-      .map((row) => ({
-        name: String(row?.name || '').trim(),
-        location: String(row?.location || '').trim(),
-      }))
-      .filter((row) => row.name || row.location);
+  const deleteNavigationItemHandler = async () => {
+    if (!navSelectedItem?.id) return;
+    
+    const success = await runAction(
+      () => deleteNavigationItemApi(navSelectedItem.id),
+      'Navigation item deleted successfully.'
+    );
 
-    if (laboratoryRows.some((row) => !row.name || !row.location)) {
-      setError('Each laboratory row needs both name and location, or remove the incomplete row.');
-      return;
+    if (success) {
+      setNavConfirmDelete(false);
+      closeNavModal();
     }
+  };
 
+  // ============================================
+  // SOCIAL LINKS HANDLERS
+  // ============================================
+
+  const openSocialView = (item) => {
+    setSocialSelectedItem(item);
+    setSocialDraft({ ...item });
+    setSocialEditMode(false);
+    setSocialModalOpen(true);
+  };
+
+  const openSocialCreate = () => {
+    setSocialSelectedItem(null);
+    setSocialDraft({ ...defaultSocialLink, sort_order: socialLinks.length });
+    setSocialEditMode(true);
+    setSocialModalOpen(true);
+  };
+
+  const closeSocialModal = () => {
+    setSocialModalOpen(false);
+    setSocialSelectedItem(null);
+    setSocialEditMode(false);
+  };
+
+  const saveSocialLinkItem = async () => {
     const payload = {
-      ...specializationsContent,
-      specializations,
-      laboratory_rows: laboratoryRows,
+      platform: socialDraft.platform,
+      icon: socialDraft.icon,
+      url: socialDraft.url,
+      sort_order: toInteger(socialDraft.sort_order, 0),
+      is_active: socialDraft.is_active ? 1 : 0,
     };
 
-    delete payload.id;
-    delete payload.created_at;
-    delete payload.updated_at;
-
-    runAction(
-      () => updateSpecializationsContent(payload),
-      'Specializations content updated successfully.',
-    );
-  };
-
-  const addSpecializationItem = () => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: [
-        ...(Array.isArray(previous.specializations) ? previous.specializations : []),
-        { ...defaultSpecializationItem },
-      ],
-    }));
-  };
-
-  const updateSpecializationItem = (index, nextItem) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) => (currentIndex === index ? { ...item, ...nextItem } : item)),
-    }));
-  };
-
-  const removeSpecializationItem = (index) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).filter((_item, currentIndex) => currentIndex !== index),
-    }));
-  };
-
-  const addSpecializationFaculty = (specializationIndex) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) =>
-        currentIndex === specializationIndex
-          ? {
-              ...item,
-              faculty: [...(Array.isArray(item.faculty) ? item.faculty : []), { ...defaultSpecializationFaculty }],
-            }
-          : item,
-      ),
-    }));
-  };
-
-  const updateSpecializationFaculty = (specializationIndex, facultyIndex, nextItem) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) => {
-        if (currentIndex !== specializationIndex) {
-          return item;
-        }
-
-        return {
-          ...item,
-          faculty: (Array.isArray(item.faculty) ? item.faculty : []).map((faculty, currentFacultyIndex) =>
-            currentFacultyIndex === facultyIndex ? { ...faculty, ...nextItem } : faculty,
-          ),
-        };
-      }),
-    }));
-  };
-
-  const removeSpecializationFaculty = (specializationIndex, facultyIndex) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) => {
-        if (currentIndex !== specializationIndex) {
-          return item;
-        }
-
-        return {
-          ...item,
-          faculty: (Array.isArray(item.faculty) ? item.faculty : []).filter(
-            (_faculty, currentFacultyIndex) => currentFacultyIndex !== facultyIndex,
-          ),
-        };
-      }),
-    }));
-  };
-
-  const addSpecializationLab = (specializationIndex) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) =>
-        currentIndex === specializationIndex
-          ? {
-              ...item,
-              labs: [...(Array.isArray(item.labs) ? item.labs : []), { ...defaultSpecializationLab }],
-            }
-          : item,
-      ),
-    }));
-  };
-
-  const updateSpecializationLab = (specializationIndex, labIndex, nextItem) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) => {
-        if (currentIndex !== specializationIndex) {
-          return item;
-        }
-
-        return {
-          ...item,
-          labs: (Array.isArray(item.labs) ? item.labs : []).map((lab, currentLabIndex) =>
-            currentLabIndex === labIndex ? { ...lab, ...nextItem } : lab,
-          ),
-        };
-      }),
-    }));
-  };
-
-  const removeSpecializationLab = (specializationIndex, labIndex) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) => {
-        if (currentIndex !== specializationIndex) {
-          return item;
-        }
-
-        return {
-          ...item,
-          labs: (Array.isArray(item.labs) ? item.labs : []).filter(
-            (_lab, currentLabIndex) => currentLabIndex !== labIndex,
-          ),
-        };
-      }),
-    }));
-  };
-
-  const addSpecializationEquipment = (specializationIndex, labIndex) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) => {
-        if (currentIndex !== specializationIndex) {
-          return item;
-        }
-
-        return {
-          ...item,
-          labs: (Array.isArray(item.labs) ? item.labs : []).map((lab, currentLabIndex) =>
-            currentLabIndex === labIndex
-              ? {
-                  ...lab,
-                  equipments: [
-                    ...(Array.isArray(lab.equipments) ? lab.equipments : []),
-                    { ...defaultSpecializationEquipment },
-                  ],
-                }
-              : lab,
-          ),
-        };
-      }),
-    }));
-  };
-
-  const updateSpecializationEquipment = (
-    specializationIndex,
-    labIndex,
-    equipmentIndex,
-    nextItem,
-  ) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) => {
-        if (currentIndex !== specializationIndex) {
-          return item;
-        }
-
-        return {
-          ...item,
-          labs: (Array.isArray(item.labs) ? item.labs : []).map((lab, currentLabIndex) => {
-            if (currentLabIndex !== labIndex) {
-              return lab;
-            }
-
-            return {
-              ...lab,
-              equipments: (Array.isArray(lab.equipments) ? lab.equipments : []).map(
-                (equipment, currentEquipmentIndex) =>
-                  currentEquipmentIndex === equipmentIndex
-                    ? { ...equipment, ...nextItem }
-                    : equipment,
-              ),
-            };
-          }),
-        };
-      }),
-    }));
-  };
-
-  const removeSpecializationEquipment = (specializationIndex, labIndex, equipmentIndex) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      specializations: (
-        Array.isArray(previous.specializations) ? previous.specializations : []
-      ).map((item, currentIndex) => {
-        if (currentIndex !== specializationIndex) {
-          return item;
-        }
-
-        return {
-          ...item,
-          labs: (Array.isArray(item.labs) ? item.labs : []).map((lab, currentLabIndex) => {
-            if (currentLabIndex !== labIndex) {
-              return lab;
-            }
-
-            return {
-              ...lab,
-              equipments: (Array.isArray(lab.equipments) ? lab.equipments : []).filter(
-                (_equipment, currentEquipmentIndex) =>
-                  currentEquipmentIndex !== equipmentIndex,
-              ),
-            };
-          }),
-        };
-      }),
-    }));
-  };
-
-  const addLaboratoryRow = () => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      laboratory_rows: [
-        ...(Array.isArray(previous.laboratory_rows) ? previous.laboratory_rows : []),
-        { ...defaultSpecializationRow },
-      ],
-    }));
-  };
-
-  const updateLaboratoryRow = (index, nextItem) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      laboratory_rows: (
-        Array.isArray(previous.laboratory_rows) ? previous.laboratory_rows : []
-      ).map((row, currentIndex) => (currentIndex === index ? { ...row, ...nextItem } : row)),
-    }));
-  };
-
-  const removeLaboratoryRow = (index) => {
-    setSpecializationsContent((previous) => ({
-      ...previous,
-      laboratory_rows: (
-        Array.isArray(previous.laboratory_rows) ? previous.laboratory_rows : []
-      ).filter((_row, currentIndex) => currentIndex !== index),
-    }));
-  };
-
-  const saveEventsContent = () => {
-    const normalizeEventsList = (items) =>
-      (Array.isArray(items) ? items : [])
-        .map((item) => ({
-          date: String(item?.date || '').trim(),
-          title: String(item?.title || '').trim(),
-          description: String(item?.description || '').trim(),
-          time: String(item?.time || '').trim() || null,
-          venue: String(item?.venue || '').trim() || null,
-          category: String(item?.category || '').trim() || 'General',
-          image_url: String(item?.image_url || '').trim() || null,
-          registration_link: String(item?.registration_link || '').trim() || null,
-        }))
-        .filter((item) => item.date || item.title || item.description);
-
-    const upcomingEvents = normalizeEventsList(eventsContent.upcoming_events);
-    const pastEvents = normalizeEventsList(eventsContent.past_events);
-
-    if (
-      [...upcomingEvents, ...pastEvents].some(
-        (item) => !item.date || !item.title || !item.description,
-      )
-    ) {
-      setError('Each event requires date, title, and description, or remove the incomplete row.');
-      return;
+    let success;
+    if (socialSelectedItem?.id) {
+      success = await runAction(
+        () => updateSocialLink(socialSelectedItem.id, payload),
+        'Social link updated successfully.'
+      );
+    } else {
+      success = await runAction(
+        () => createSocialLink(payload),
+        'Social link created successfully.'
+      );
     }
 
+    if (success) {
+      setSocialConfirmSave(false);
+      closeSocialModal();
+    }
+  };
+
+  const deleteSocialLinkItem = async () => {
+    if (!socialSelectedItem?.id) return;
+    
+    const success = await runAction(
+      () => deleteSocialLink(socialSelectedItem.id),
+      'Social link deleted successfully.'
+    );
+
+    if (success) {
+      setSocialConfirmDelete(false);
+      closeSocialModal();
+    }
+  };
+
+  // ============================================
+  // FOOTER LINKS HANDLERS
+  // ============================================
+
+  const openFooterView = (item) => {
+    setFooterSelectedItem(item);
+    setFooterDraft({ ...item });
+    setFooterEditMode(false);
+    setFooterModalOpen(true);
+  };
+
+  const openFooterCreate = () => {
+    setFooterSelectedItem(null);
+    setFooterDraft({ ...defaultFooterLink, sort_order: footerLinks.length });
+    setFooterEditMode(true);
+    setFooterModalOpen(true);
+  };
+
+  const closeFooterModal = () => {
+    setFooterModalOpen(false);
+    setFooterSelectedItem(null);
+    setFooterEditMode(false);
+  };
+
+  const saveFooterLinkItem = async () => {
     const payload = {
-      ...eventsContent,
-      upcoming_events: upcomingEvents,
-      past_events: pastEvents,
+      section: footerDraft.section,
+      label: footerDraft.label,
+      href: footerDraft.href,
+      sort_order: toInteger(footerDraft.sort_order, 0),
+      is_active: footerDraft.is_active ? 1 : 0,
     };
 
-    delete payload.id;
-    delete payload.created_at;
-    delete payload.updated_at;
+    let success;
+    if (footerSelectedItem?.id) {
+      success = await runAction(
+        () => updateFooterLink(footerSelectedItem.id, payload),
+        'Footer link updated successfully.'
+      );
+    } else {
+      success = await runAction(
+        () => createFooterLink(payload),
+        'Footer link created successfully.'
+      );
+    }
 
-    runAction(
-      () => updateEventsContent(payload),
-      'Events content updated successfully.',
+    if (success) {
+      setFooterConfirmSave(false);
+      closeFooterModal();
+    }
+  };
+
+  const deleteFooterLinkItem = async () => {
+    if (!footerSelectedItem?.id) return;
+    
+    const success = await runAction(
+      () => deleteFooterLink(footerSelectedItem.id),
+      'Footer link deleted successfully.'
     );
+
+    if (success) {
+      setFooterConfirmDelete(false);
+      closeFooterModal();
+    }
   };
 
-  const addEventsListItem = (field) => {
-    setEventsContent((previous) => ({
-      ...previous,
-      [field]: [...(Array.isArray(previous[field]) ? previous[field] : []), { ...defaultEventsItem }],
-    }));
+  // ============================================
+  // HERO SLIDES HANDLERS
+  // ============================================
+
+  const openSlideView = (item) => {
+    setSlideSelectedItem(item);
+    setSlideDraft({ ...item });
+    setSlideEditMode(false);
+    setSlideModalOpen(true);
   };
 
-  const updateEventsListItem = (field, index, nextItem) => {
-    setEventsContent((previous) => ({
-      ...previous,
-      [field]: (Array.isArray(previous[field]) ? previous[field] : []).map((item, currentIndex) =>
-        currentIndex === index ? { ...item, ...nextItem } : item,
-      ),
-    }));
+  const openSlideCreate = () => {
+    setSlideSelectedItem(null);
+    setSlideDraft({ ...defaultSlide, sort_order: slides.length });
+    setSlideEditMode(true);
+    setSlideModalOpen(true);
   };
 
-  const removeEventsListItem = (field, index) => {
-    setEventsContent((previous) => ({
-      ...previous,
-      [field]: (Array.isArray(previous[field]) ? previous[field] : []).filter(
-        (_item, currentIndex) => currentIndex !== index,
-      ),
-    }));
+  const closeSlideModal = () => {
+    setSlideModalOpen(false);
+    setSlideSelectedItem(null);
+    setSlideEditMode(false);
   };
 
-  const saveContactContent = () => {
-    const contactInfoCards = (Array.isArray(contactContent.contact_info_cards)
-      ? contactContent.contact_info_cards
-      : []
-    )
-      .map((item) => ({
-        icon_name: String(item?.icon_name || 'MapPin').trim(),
-        title: String(item?.title || '').trim(),
-        details: Array.isArray(item?.details)
-          ? item.details.map((detail) => String(detail || '').trim()).filter(Boolean)
-          : [],
-      }))
-      .filter((item) => item.title || item.details.length > 0);
-
-    if (contactInfoCards.some((item) => !item.title || item.details.length === 0)) {
-      setError('Each contact info card needs title and at least one detail line.');
-      return;
-    }
-
-    const formCategories = (Array.isArray(contactContent.form_categories)
-      ? contactContent.form_categories
-      : []
-    )
-      .map((item) => String(item || '').trim())
-      .filter(Boolean);
-
-    if (formCategories.length === 0) {
-      setError('Please provide at least one form category.');
-      return;
-    }
-
-    const keyContacts = (Array.isArray(contactContent.key_contacts)
-      ? contactContent.key_contacts
-      : []
-    )
-      .map((item) => ({
-        name: String(item?.name || '').trim(),
-        designation: String(item?.designation || '').trim(),
-        email: String(item?.email || '').trim(),
-        phone: String(item?.phone || '').trim(),
-        office: String(item?.office || '').trim(),
-      }))
-      .filter((item) => item.name || item.email || item.phone);
-
-    if (
-      keyContacts.some(
-        (item) =>
-          !item.name || !item.designation || !item.email || !item.phone || !item.office,
-      )
-    ) {
-      setError('Each key contact needs name, designation, email, phone, and office.');
-      return;
-    }
-
-    const quickLinks = (Array.isArray(contactContent.quick_links)
-      ? contactContent.quick_links
-      : []
-    )
-      .map((item) => ({
-        title: String(item?.title || '').trim(),
-        description: String(item?.description || '').trim(),
-        url: String(item?.url || '').trim() || null,
-      }))
-      .filter((item) => item.title || item.description);
-
-    if (quickLinks.some((item) => !item.title || !item.description)) {
-      setError('Each quick link needs title and description.');
-      return;
-    }
-
-    const stayConnectedLinks = (Array.isArray(contactContent.stay_connected_links)
-      ? contactContent.stay_connected_links
-      : []
-    )
-      .map((item) => ({
-        icon_name: String(item?.icon_name || 'Globe').trim(),
-        label: String(item?.label || '').trim(),
-        url: String(item?.url || '').trim() || null,
-      }))
-      .filter((item) => item.label || item.url);
-
-    if (stayConnectedLinks.some((item) => !item.label)) {
-      setError('Each stay connected link needs a label.');
-      return;
-    }
-
-    const footerCards = (Array.isArray(contactContent.footer_cards)
-      ? contactContent.footer_cards
-      : []
-    )
-      .map((item) => ({
-        title: String(item?.title || '').trim(),
-        description: String(item?.description || '').trim(),
-      }))
-      .filter((item) => item.title || item.description);
-
-    if (footerCards.some((item) => !item.title || !item.description)) {
-      setError('Each footer card needs title and description.');
-      return;
-    }
-
+  const saveSlideItem = async () => {
     const payload = {
-      ...contactContent,
-      contact_info_cards: contactInfoCards,
-      form_categories: formCategories,
-      key_contacts: keyContacts,
-      quick_links: quickLinks,
-      stay_connected_links: stayConnectedLinks,
-      footer_cards: footerCards,
-      map_embed_url: String(contactContent.map_embed_url || '').trim(),
+      image_url: slideDraft.image_url,
+      title: slideDraft.title,
+      subtitle: slideDraft.subtitle,
+      cta_text: slideDraft.cta_text,
+      cta_link: slideDraft.cta_link,
+      sort_order: toInteger(slideDraft.sort_order, 0),
+      is_active: slideDraft.is_active ? 1 : 0,
     };
 
-    if (!payload.map_embed_url) {
-      setError('Map embed URL is required.');
-      return;
+    let success;
+    if (slideSelectedItem?.id) {
+      success = await runAction(
+        () => updateHeroSlide(slideSelectedItem.id, payload),
+        'Hero slide updated successfully.'
+      );
+    } else {
+      success = await runAction(
+        () => createHeroSlide(payload),
+        'Hero slide created successfully.'
+      );
     }
 
-    delete payload.id;
-    delete payload.created_at;
-    delete payload.updated_at;
+    if (success) {
+      setSlideConfirmSave(false);
+      closeSlideModal();
+    }
+  };
 
-    runAction(
-      () => updateContactContent(payload),
-      'Contact content updated successfully.',
+  const deleteSlideItem = async () => {
+    if (!slideSelectedItem?.id) return;
+    
+    const success = await runAction(
+      () => deleteHeroSlide(slideSelectedItem.id),
+      'Hero slide deleted successfully.'
     );
+
+    if (success) {
+      setSlideConfirmDelete(false);
+      closeSlideModal();
+    }
   };
 
-  const addContactListItem = (field, itemTemplate) => {
-    setContactContent((previous) => ({
-      ...previous,
-      [field]: [...(Array.isArray(previous[field]) ? previous[field] : []), { ...itemTemplate }],
-    }));
+  // ============================================
+  // HOME STATS HANDLERS
+  // ============================================
+
+  const openStatView = (item) => {
+    setStatSelectedItem(item);
+    setStatDraft({ ...item });
+    setStatEditMode(false);
+    setStatModalOpen(true);
   };
 
-  const updateContactListItem = (field, index, nextItem) => {
-    setContactContent((previous) => ({
-      ...previous,
-      [field]: (Array.isArray(previous[field]) ? previous[field] : []).map((item, currentIndex) =>
-        currentIndex === index ? { ...item, ...nextItem } : item,
-      ),
-    }));
+  const openStatCreate = () => {
+    setStatSelectedItem(null);
+    setStatDraft({ ...defaultStat, sort_order: stats.length });
+    setStatEditMode(true);
+    setStatModalOpen(true);
   };
 
-  const removeContactListItem = (field, index) => {
-    setContactContent((previous) => ({
-      ...previous,
-      [field]: (Array.isArray(previous[field]) ? previous[field] : []).filter(
-        (_item, currentIndex) => currentIndex !== index,
-      ),
-    }));
+  const closeStatModal = () => {
+    setStatModalOpen(false);
+    setStatSelectedItem(null);
+    setStatEditMode(false);
   };
 
-  const saveNavigationItem = (item) => {
+  const saveStatItem = async () => {
     const payload = {
-      label: item.label,
-      href: item.href,
-      sort_order: toInteger(item.sort_order),
-      is_active: item.is_active ? 1 : 0,
+      label: statDraft.label,
+      value: toInteger(statDraft.value, 0),
+      suffix: statDraft.suffix,
+      icon_name: statDraft.icon_name,
+      sort_order: toInteger(statDraft.sort_order, 0),
+      is_active: statDraft.is_active ? 1 : 0,
     };
 
-    runAction(
-      () =>
-        item.id
-          ? updateNavigationItem(item.id, payload)
-          : createNavigationItem(payload),
-      'Navigation saved successfully.'
-    );
-  };
-
-  const removeNavigationItem = (item) => {
-    if (!item.id) {
-      setNavigationItems((previous) => previous.filter((entry) => entry !== item));
-      return;
+    let success;
+    if (statSelectedItem?.id) {
+      success = await runAction(
+        () => updateHomeStat(statSelectedItem.id, payload),
+        'Home stat updated successfully.'
+      );
+    } else {
+      success = await runAction(
+        () => createHomeStat(payload),
+        'Home stat created successfully.'
+      );
     }
 
-    runAction(
-      () => deleteNavigationItem(item.id),
-      'Navigation item deleted.'
-    );
+    if (success) {
+      setStatConfirmSave(false);
+      closeStatModal();
+    }
   };
 
-  const saveSocialLink = (item) => {
+  const deleteStatItem = async () => {
+    if (!statSelectedItem?.id) return;
+    
+    const success = await runAction(
+      () => deleteHomeStat(statSelectedItem.id),
+      'Home stat deleted successfully.'
+    );
+
+    if (success) {
+      setStatConfirmDelete(false);
+      closeStatModal();
+    }
+  };
+
+  // ============================================
+  // NEWS ITEMS HANDLERS
+  // ============================================
+
+  const openNewsView = (item) => {
+    setNewsSelectedItem(item);
+    setNewsDraft({ ...item });
+    setNewsEditMode(false);
+    setNewsModalOpen(true);
+  };
+
+  const openNewsCreate = () => {
+    setNewsSelectedItem(null);
+    setNewsDraft({ ...defaultNewsItem, publish_date: formatDateTimeLocal(new Date()) });
+    setNewsEditMode(true);
+    setNewsModalOpen(true);
+  };
+
+  const closeNewsModal = () => {
+    setNewsModalOpen(false);
+    setNewsSelectedItem(null);
+    setNewsEditMode(false);
+  };
+
+  const saveNewsItemEntry = async () => {
     const payload = {
-      platform: item.platform,
-      icon: item.icon,
-      url: item.url,
-      sort_order: toInteger(item.sort_order),
-      is_active: item.is_active ? 1 : 0,
+      title: newsDraft.title,
+      excerpt: newsDraft.excerpt,
+      category: newsDraft.category,
+      image_url: newsDraft.image_url,
+      external_link: newsDraft.external_link,
+      publish_date: toIsoDateTime(newsDraft.publish_date),
+      is_active: newsDraft.is_active ? 1 : 0,
     };
 
-    runAction(
-      () =>
-        item.id
-          ? updateSocialLink(item.id, payload)
-          : createSocialLink(payload),
-      'Social link saved successfully.'
-    );
-  };
-
-  const removeSocialLink = (item) => {
-    if (!item.id) {
-      setSocialLinks((previous) => previous.filter((entry) => entry !== item));
-      return;
+    let success;
+    if (newsSelectedItem?.id) {
+      success = await runAction(
+        () => updateNewsItem(newsSelectedItem.id, payload),
+        'News item updated successfully.'
+      );
+    } else {
+      success = await runAction(
+        () => createNewsItem(payload),
+        'News item created successfully.'
+      );
     }
 
-    runAction(
-      () => deleteSocialLink(item.id),
-      'Social link deleted.'
-    );
-  };
-
-  const saveFooterLink = (item) => {
-    const payload = {
-      section: item.section,
-      label: item.label,
-      href: item.href,
-      sort_order: toInteger(item.sort_order),
-      is_active: item.is_active ? 1 : 0,
-    };
-
-    runAction(
-      () =>
-        item.id
-          ? updateFooterLink(item.id, payload)
-          : createFooterLink(payload),
-      'Footer link saved successfully.'
-    );
-  };
-
-  const removeFooterLink = (item) => {
-    if (!item.id) {
-      setFooterLinks((previous) => previous.filter((entry) => entry !== item));
-      return;
+    if (success) {
+      setNewsConfirmSave(false);
+      closeNewsModal();
     }
-
-    runAction(
-      () => deleteFooterLink(item.id),
-      'Footer link deleted.'
-    );
   };
 
-  const saveSlide = (item) => {
-    const payload = {
-      image_url: item.image_url,
-      title: item.title,
-      subtitle: item.subtitle,
-      cta_text: item.cta_text,
-      cta_link: item.cta_link,
-      sort_order: toInteger(item.sort_order),
-      is_active: item.is_active ? 1 : 0,
-    };
-
-    runAction(
-      () =>
-        item.id
-          ? updateHeroSlide(item.id, payload)
-          : createHeroSlide(payload),
-      'Hero slide saved successfully.'
+  const deleteNewsItemEntry = async () => {
+    if (!newsSelectedItem?.id) return;
+    
+    const success = await runAction(
+      () => deleteNewsItem(newsSelectedItem.id),
+      'News item deleted successfully.'
     );
-  };
 
-  const removeSlide = (item) => {
-    if (!item.id) {
-      setSlides((previous) => previous.filter((entry) => entry !== item));
-      return;
+    if (success) {
+      setNewsConfirmDelete(false);
+      closeNewsModal();
     }
-
-    runAction(
-      () => deleteHeroSlide(item.id),
-      'Hero slide deleted.'
-    );
   };
 
-  const saveStat = (item) => {
-    const payload = {
-      label: item.label,
-      value: toInteger(item.value),
-      suffix: item.suffix || '',
-      icon_name: item.icon_name,
-      sort_order: toInteger(item.sort_order),
-      is_active: item.is_active ? 1 : 0,
-    };
+  // ============================================
+  // PEOPLE DIRECTORY HANDLERS
+  // ============================================
 
-    runAction(
-      () =>
-        item.id
-          ? updateHomeStat(item.id, payload)
-          : createHomeStat(payload),
-      'Home stat saved successfully.'
-    );
+  const openPeopleView = (item) => {
+    const normalized = normalizePeopleEntryForUi(item);
+    setPeopleSelectedItem(normalized);
+    setPeopleDraft(toPeopleDraft(normalized));
+    setPeopleEditMode(false);
+    setPeopleModalOpen(true);
   };
 
-  const removeStat = (item) => {
-    if (!item.id) {
-      setStats((previous) => previous.filter((entry) => entry !== item));
-      return;
-    }
-
-    runAction(
-      () => deleteHomeStat(item.id),
-      'Home stat deleted.'
-    );
-  };
-
-  const saveNews = (item) => {
-    const publishDate = toIsoDateTime(item.publish_date);
-
-    if (!publishDate) {
-      setError('Please provide a valid publish date for news item.');
-      setSuccessMessage('');
-      return;
-    }
-
-    const payload = {
-      title: item.title,
-      excerpt: item.excerpt,
-      category: item.category,
-      image_url: item.image_url || null,
-      external_link: item.external_link || null,
-      publish_date: publishDate,
-      is_active: item.is_active ? 1 : 0,
-    };
-
-    runAction(
-      () => (item.id ? updateNewsItem(item.id, payload) : createNewsItem(payload)),
-      'News item saved successfully.'
-    );
-  };
-
-  const removeNews = (item) => {
-    if (!item.id) {
-      setNewsItems((previous) => previous.filter((entry) => entry !== item));
-      return;
-    }
-
-    runAction(
-      () => deleteNewsItem(item.id),
-      'News item deleted.'
-    );
-  };
-
-  const toNullableString = (value) => {
-    const nextValue = String(value || '').trim();
-    return nextValue.length > 0 ? nextValue : null;
-  };
-
-  const toStringArrayFromText = (value) => {
-    const text = String(value || '');
-
-    return text
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
+  const openPeopleCreate = () => {
+    setPeopleSelectedItem(null);
+    setPeopleDraft({ ...defaultPeopleEntry, sort_order: peopleEntries.length });
+    setPeopleEditMode(true);
+    setPeopleModalOpen(true);
   };
 
   const closePeopleModal = () => {
-    setIsPeopleModalOpen(false);
-    setEditingPeopleId(null);
-    setPeopleDraft(defaultPeopleEntry);
-  };
-
-  const openCreatePeopleModal = () => {
-    clearMessages();
-    setEditingPeopleId(null);
-    setPeopleDraft(defaultPeopleEntry);
-    setIsPeopleModalOpen(true);
-  };
-
-  const openEditPeopleModal = (entry) => {
-    clearMessages();
-    setEditingPeopleId(entry.id || null);
-    setPeopleDraft({
-      category: entry.category || 'faculty',
-      name: entry.name || '',
-      designation: entry.designation || '',
-      specialization: entry.specialization || '',
-      department: entry.department || '',
-      year_label: entry.year_label || '',
-      email: entry.email || '',
-      phone: entry.phone || '',
-      room: entry.room || '',
-      profile_url: entry.profile_url || '',
-      image_url: entry.image_url || '',
-      resource_link: entry.resource_link || '',
-      research_interests_text: Array.isArray(entry.research_interests)
-        ? entry.research_interests.join('\n')
-        : '',
-      responsibilities_text: Array.isArray(entry.responsibilities)
-        ? entry.responsibilities.join('\n')
-        : '',
-      sort_order: toInteger(entry.sort_order),
-      is_active: entry.is_active ? 1 : 0,
-    });
-    setIsPeopleModalOpen(true);
+    setPeopleModalOpen(false);
+    setPeopleSelectedItem(null);
+    setPeopleEditMode(false);
   };
 
   const savePeopleEntry = async () => {
     const category = peopleDraft.category;
-    const isListType = category === 'mtech' || category === 'btech';
 
     if (!category) {
       setError('Please select a people category.');
-      setSuccessMessage('');
-      return;
-    }
-
-    if (isListType) {
-      if (!toNullableString(peopleDraft.year_label)) {
-        setError('Year label is required for student list entries.');
-        setSuccessMessage('');
-        return;
-      }
-
-      if (!toNullableString(peopleDraft.resource_link)) {
-        setError('Resource link is required for student list entries.');
-        setSuccessMessage('');
-        return;
-      }
-    } else if (!toNullableString(peopleDraft.name)) {
-      setError('Name is required for faculty, staff, and Ph.D. entries.');
       setSuccessMessage('');
       return;
     }
@@ -1813,9 +1666,11 @@ const AdminDashboard = () => {
       resource_link: toNullableString(peopleDraft.resource_link),
       research_interests: toStringArrayFromText(peopleDraft.research_interests_text),
       responsibilities: toStringArrayFromText(peopleDraft.responsibilities_text),
-      sort_order: toInteger(peopleDraft.sort_order),
+      sort_order: toInteger(peopleDraft.sort_order, 0),
       is_active: peopleDraft.is_active ? 1 : 0,
     };
+
+    const isListType = category === 'mtech' || category === 'btech';
 
     if (isListType) {
       payload.image_url = null;
@@ -1847,127 +1702,721 @@ const AdminDashboard = () => {
       payload.responsibilities = [];
     }
 
-    const wasSuccessful = await runAction(
-      () =>
-        editingPeopleId
-          ? updatePeopleEntry(editingPeopleId, payload)
-          : createPeopleEntry(payload),
-      editingPeopleId ? 'People entry updated successfully.' : 'People entry created successfully.'
-    );
+    let success;
+    if (peopleSelectedItem?.id) {
+      success = await runAction(
+        () => updatePeopleEntry(peopleSelectedItem.id, payload),
+        'People entry updated successfully.'
+      );
+    } else {
+      success = await runAction(
+        () => createPeopleEntry(payload),
+        'People entry created successfully.'
+      );
+    }
 
-    if (wasSuccessful) {
+    if (success) {
+      setPeopleConfirmSave(false);
       closePeopleModal();
     }
   };
 
-  const removePeople = (entry) => {
-    if (!entry.id) {
+  const deletePeopleEntryItem = async () => {
+    if (!peopleSelectedItem?.id) return;
+    
+    const success = await runAction(
+      () => deletePeopleEntry(peopleSelectedItem.id),
+      'People entry deleted successfully.'
+    );
+
+    if (success) {
+      setPeopleConfirmDelete(false);
+      closePeopleModal();
+    }
+  };
+
+  // Get filtered people entries
+  const filteredPeopleEntries = peopleFilterCategory === 'all' 
+    ? peopleEntries 
+    : peopleEntries.filter(p => p.category === peopleFilterCategory);
+
+  // ============================================
+  // CONTACT CONTENT HANDLERS
+  // ============================================
+
+  const saveContactContentHandler = async () => {
+    const contactInfoCards = (Array.isArray(contactContent.contact_info_cards) ? contactContent.contact_info_cards : [])
+      .map((card) => ({
+        icon_name: card?.icon_name || 'MapPin',
+        title: String(card?.title || '').trim(),
+        details: Array.isArray(card?.details) ? card.details.map(d => String(d || '').trim()).filter(Boolean) : [],
+      }))
+      .filter((card) => card.title || card.details.length > 0);
+
+    if (contactInfoCards.some((card) => !card.title || card.details.length === 0)) {
+      setError('Each contact info card needs title and at least one detail line.');
+      setSuccessMessage('');
       return;
     }
 
-    runAction(
-      () => deletePeopleEntry(entry.id),
-      'People entry deleted.'
+    const formCategories = (Array.isArray(contactContent.form_categories) ? contactContent.form_categories : [])
+      .map((cat) => String(cat || '').trim())
+      .filter(Boolean);
+
+    const keyContacts = (Array.isArray(contactContent.key_contacts) ? contactContent.key_contacts : [])
+      .map((contact) => ({
+        name: String(contact?.name || '').trim(),
+        designation: String(contact?.designation || '').trim(),
+        email: String(contact?.email || '').trim(),
+        phone: String(contact?.phone || '').trim(),
+        office: String(contact?.office || '').trim(),
+      }))
+      .filter((contact) => contact.name || contact.designation || contact.email || contact.phone || contact.office);
+
+    if (
+      keyContacts.some(
+        (contact) =>
+          !contact.name ||
+          !contact.designation ||
+          !contact.email ||
+          !contact.phone ||
+          !contact.office,
+      )
+    ) {
+      setError('Each key contact needs name, designation, email, phone, and office.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const quickLinks = (Array.isArray(contactContent.quick_links) ? contactContent.quick_links : [])
+      .map((link) => ({
+        title: String(link?.title || '').trim(),
+        description: String(link?.description || '').trim(),
+        url: toNullableString(link?.url),
+      }))
+      .filter((link) => link.title || link.description || link.url);
+
+    if (quickLinks.some((link) => !link.title || !link.description)) {
+      setError('Each quick link needs title and description.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const stayConnectedLinks = (Array.isArray(contactContent.stay_connected_links) ? contactContent.stay_connected_links : [])
+      .map((link) => ({
+        icon_name: link?.icon_name || 'Globe',
+        label: String(link?.label || '').trim(),
+        url: toNullableString(link?.url),
+      }))
+      .filter((link) => link.label || link.url);
+
+    if (stayConnectedLinks.some((link) => !link.label)) {
+      setError('Each stay connected link needs a label.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const footerCards = (Array.isArray(contactContent.footer_cards) ? contactContent.footer_cards : [])
+      .map((card) => ({
+        title: String(card?.title || '').trim(),
+        description: String(card?.description || '').trim(),
+      }))
+      .filter((card) => card.title || card.description);
+
+    if (footerCards.some((card) => !card.title || !card.description)) {
+      setError('Each footer card needs title and description.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const mapEmbedUrl = String(contactContent.map_embed_url || '').trim();
+    if (!mapEmbedUrl) {
+      setError('Map embed URL is required.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const payload = {
+      ...contactContent,
+      contact_info_cards: contactInfoCards,
+      form_categories: formCategories,
+      key_contacts: keyContacts,
+      quick_links: quickLinks,
+      stay_connected_links: stayConnectedLinks,
+      footer_cards: footerCards,
+      map_embed_url: mapEmbedUrl,
+    };
+
+    delete payload.id;
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    const success = await runAction(
+      () => updateContactContent(payload),
+      'Contact content updated successfully.'
     );
+
+    if (success) {
+      setContactConfirmSave(false);
+      setContactEditMode(false);
+    }
   };
 
+  const addContactListItem = (field, itemTemplate) => {
+    setContactContent((prev) => ({
+      ...prev,
+      [field]: [...(Array.isArray(prev[field]) ? prev[field] : []), { ...itemTemplate }],
+    }));
+  };
+
+  const updateContactListItem = (field, index, nextItem) => {
+    setContactContent((prev) => ({
+      ...prev,
+      [field]: (Array.isArray(prev[field]) ? prev[field] : []).map((item, i) =>
+        i === index ? { ...item, ...nextItem } : item
+      ),
+    }));
+  };
+
+  const removeContactListItem = (field, index) => {
+    setContactContent((prev) => ({
+      ...prev,
+      [field]: (Array.isArray(prev[field]) ? prev[field] : []).filter((_, i) => i !== index),
+    }));
+  };
+
+  // ============================================
+  // EVENTS CONTENT HANDLERS
+  // ============================================
+
+  const saveEventsContentHandler = async () => {
+    const upcomingEvents = (Array.isArray(eventsContent.upcoming_events) ? eventsContent.upcoming_events : [])
+      .map((event) => ({
+        date: String(event?.date || '').trim(),
+        title: String(event?.title || '').trim(),
+        description: String(event?.description || '').trim(),
+        time: toNullableString(event?.time),
+        venue: toNullableString(event?.venue),
+        category: String(event?.category || 'Seminar').trim(),
+        image_url: toNullableString(event?.image_url),
+        registration_link: toNullableString(event?.registration_link),
+      }))
+      .filter((event) => event.date || event.title || event.description);
+
+    const pastEvents = (Array.isArray(eventsContent.past_events) ? eventsContent.past_events : [])
+      .map((event) => ({
+        date: String(event?.date || '').trim(),
+        title: String(event?.title || '').trim(),
+        description: String(event?.description || '').trim(),
+        time: toNullableString(event?.time),
+        venue: toNullableString(event?.venue),
+        category: String(event?.category || 'Seminar').trim(),
+        image_url: toNullableString(event?.image_url),
+        registration_link: toNullableString(event?.registration_link),
+      }))
+      .filter((event) => event.date || event.title || event.description);
+
+    if (
+      [...upcomingEvents, ...pastEvents].some(
+        (event) => !event.date || !event.title || !event.description,
+      )
+    ) {
+      setError('Each event requires date, title, and description, or remove the incomplete row.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const payload = {
+      ...eventsContent,
+      upcoming_events: upcomingEvents,
+      past_events: pastEvents,
+    };
+
+    delete payload.id;
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    const success = await runAction(
+      () => updateEventsContent(payload),
+      'Events content updated successfully.'
+    );
+
+    if (success) {
+      setEventsConfirmSave(false);
+      setEventsEditMode(false);
+    }
+  };
+
+  const addEventItem = (field) => {
+    setEventsContent((prev) => ({
+      ...prev,
+      [field]: [...(Array.isArray(prev[field]) ? prev[field] : []), { ...defaultEventsItem }],
+    }));
+  };
+
+  const updateEventItem = (field, index, nextItem) => {
+    setEventsContent((prev) => ({
+      ...prev,
+      [field]: (Array.isArray(prev[field]) ? prev[field] : []).map((item, i) =>
+        i === index ? { ...item, ...nextItem } : item
+      ),
+    }));
+  };
+
+  const removeEventItem = (field, index) => {
+    setEventsContent((prev) => ({
+      ...prev,
+      [field]: (Array.isArray(prev[field]) ? prev[field] : []).filter((_, i) => i !== index),
+    }));
+  };
+
+  // ============================================
+  // SPECIALIZATIONS CONTENT HANDLERS
+  // ============================================
+
+  const saveSpecializationsContentHandler = async () => {
+    const specializations = (Array.isArray(specializationsContent.specializations) ? specializationsContent.specializations : [])
+      .map((spec) => ({
+        key: String(spec?.key || '').trim(),
+        title: String(spec?.title || '').trim(),
+        description: String(spec?.description || '').trim(),
+        color: spec?.color || 'blue',
+        icon_name: spec?.icon_name || 'Building',
+        image_url: String(spec?.image_url || '').trim(),
+        faculty: Array.isArray(spec?.faculty) ? spec.faculty.map(f => ({
+          name: String(f?.name || '').trim(),
+          url: toNullableString(f?.url),
+        })).filter(f => f.name) : [],
+        labs: Array.isArray(spec?.labs) ? spec.labs.map(l => ({
+          name: String(l?.name || '').trim(),
+          equipments: Array.isArray(l?.equipments) ? l.equipments.map(e => ({
+            name: String(e?.name || '').trim(),
+            image_url: toNullableString(e?.image_url),
+          })).filter(e => e.name) : [],
+        })).filter(l => l.name) : [],
+      }))
+      .filter((spec) => spec.key || spec.title || spec.description);
+
+    if (
+      specializations.some(
+        (spec) =>
+          !spec.key ||
+          !spec.title ||
+          !spec.description ||
+          !spec.color ||
+          !spec.icon_name ||
+          !spec.image_url,
+      )
+    ) {
+      setError('Each specialization needs key, title, description, color, icon, and image URL, or remove the incomplete row.');
+      setSuccessMessage('');
+      return;
+    }
+
+    if (
+      specializations.some((spec) =>
+        spec.labs.some((lab) => !lab.name || lab.equipments.some((equipment) => !equipment.name)),
+      )
+    ) {
+      setError('Each lab needs a name and each listed equipment needs a name.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const laboratoryRows = (Array.isArray(specializationsContent.laboratory_rows) ? specializationsContent.laboratory_rows : [])
+      .map((row) => ({
+        name: String(row?.name || '').trim(),
+        location: String(row?.location || '').trim(),
+      }))
+      .filter((row) => row.name || row.location);
+
+    if (laboratoryRows.some((row) => !row.name || !row.location)) {
+      setError('Each laboratory row needs both name and location, or remove the incomplete row.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const payload = {
+      ...specializationsContent,
+      specializations,
+      laboratory_rows: laboratoryRows,
+    };
+
+    delete payload.id;
+    delete payload.created_at;
+    delete payload.updated_at;
+
+    const success = await runAction(
+      () => updateSpecializationsContent(payload),
+      'Specializations content updated successfully.'
+    );
+
+    if (success) {
+      setSpecializationsConfirmSave(false);
+      setSpecializationsEditMode(false);
+    }
+  };
+
+  const addSpecialization = () => {
+    setSpecializationsContent((prev) => ({
+      ...prev,
+      specializations: [...(Array.isArray(prev.specializations) ? prev.specializations : []), { ...defaultSpecializationItem }],
+    }));
+  };
+
+  const updateSpecialization = (index, nextItem) => {
+    setSpecializationsContent((prev) => ({
+      ...prev,
+      specializations: (Array.isArray(prev.specializations) ? prev.specializations : []).map((item, i) =>
+        i === index ? { ...item, ...nextItem } : item
+      ),
+    }));
+  };
+
+  const removeSpecialization = (index) => {
+    setSpecializationsContent((prev) => ({
+      ...prev,
+      specializations: (Array.isArray(prev.specializations) ? prev.specializations : []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const addLabRow = () => {
+    setSpecializationsContent((prev) => ({
+      ...prev,
+      laboratory_rows: [...(Array.isArray(prev.laboratory_rows) ? prev.laboratory_rows : []), { ...defaultSpecializationRow }],
+    }));
+  };
+
+  const updateLabRow = (index, nextItem) => {
+    setSpecializationsContent((prev) => ({
+      ...prev,
+      laboratory_rows: (Array.isArray(prev.laboratory_rows) ? prev.laboratory_rows : []).map((item, i) =>
+        i === index ? { ...item, ...nextItem } : item
+      ),
+    }));
+  };
+
+  const removeLabRow = (index) => {
+    setSpecializationsContent((prev) => ({
+      ...prev,
+      laboratory_rows: (Array.isArray(prev.laboratory_rows) ? prev.laboratory_rows : []).filter((_, i) => i !== index),
+    }));
+  };
+
+  // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-gray-700 text-lg font-medium">Loading admin content...</p>
+      <div 
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          backgroundColor: isDark ? '#111827' : '#f8fafc'
+        }}
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p style={{ color: isDark ? '#9ca3af' : '#4b5563' }} className="text-sm font-medium">
+            Loading admin content...
+          </p>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="admin-dashboard-page min-h-screen bg-gray-100">
-      <header className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Content Admin</h1>
-            <p className="text-sm text-gray-600">
-              Signed in as {adminUser?.username || 'admin'}
-            </p>
-          </div>
+  // Site Settings Table Data
+  const siteSettingsTableData = [
+    { key: 'site_name', label: 'Site Name', value: siteSettings.site_name, type: 'text' },
+    { key: 'department_name', label: 'Department Name', value: siteSettings.department_name, type: 'text' },
+    { key: 'logo_url', label: 'Logo URL', value: siteSettings.logo_url, type: 'image' },
+    { key: 'navbar_title', label: 'Navbar Title', value: siteSettings.navbar_title, type: 'text' },
+    { key: 'navbar_subtitle', label: 'Navbar Subtitle', value: siteSettings.navbar_subtitle, type: 'text' },
+    { key: 'footer_description', label: 'Footer Description', value: siteSettings.footer_description, type: 'textarea' },
+    { key: 'contact_address_lines_text', label: 'Contact Address', value: siteSettings.contact_address_lines_text, type: 'textarea' },
+    { key: 'contact_phone', label: 'Contact Phone', value: siteSettings.contact_phone, type: 'text' },
+    { key: 'contact_email', label: 'Contact Email', value: siteSettings.contact_email, type: 'text' },
+    { key: 'map_embed_url', label: 'Map Embed URL', value: siteSettings.map_embed_url, type: 'text' },
+    { key: 'copyright_text', label: 'Copyright Text', value: siteSettings.copyright_text, type: 'text' },
+  ];
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={isWorking}
-            className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-900 text-white font-medium disabled:bg-gray-500"
-          >
-            Logout
-          </button>
+  return (
+    <div 
+      className="min-h-screen"
+      style={{
+        backgroundColor: isDark ? '#111827' : '#f8fafc'
+      }}
+    >
+      {/* Header */}
+      <header 
+        className="sticky top-0 z-30 backdrop-blur-lg"
+        style={{
+          backgroundColor: isDark ? 'rgba(31, 41, 55, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+          borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Left side */}
+            <div className="flex items-center gap-4">
+              {/* Mobile menu button */}
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="lg:hidden p-2 rounded-lg"
+                style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              
+            {/* Logo */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: '#2563eb' }}>
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                  </div>
+                  <div className="hidden sm:block">
+                    <h1 
+                      className="text-lg font-bold"
+                      style={{ color: isDark ? '#ffffff' : '#111827' }}
+                    >
+                      Admin Panel
+                    </h1>
+                    <p 
+                      className="text-xs"
+                      style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
+                    >
+                      Content Management
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            {/* Right side */}
+            <div className="flex items-center gap-3">
+              {/* Theme toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-2.5 rounded-xl"
+                style={{
+                  backgroundColor: isDark ? '#374151' : '#f3f4f6',
+                  color: isDark ? '#9ca3af' : '#4b5563'
+                }}
+                aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                {theme === 'dark' ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+
+              {/* User info */}
+              <div 
+                className="hidden sm:flex items-center gap-3 pl-3"
+                style={{ borderLeft: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style={{ backgroundColor: '#2563eb' }}>
+                  {adminUser?.username?.charAt(0).toUpperCase() || 'A'}
+                </div>
+                <span 
+                  className="text-sm font-medium"
+                  style={{ color: isDark ? '#d1d5db' : '#374151' }}
+                >
+                  {adminUser?.username || 'Admin'}
+                </span>
+              </div>
+
+              {/* Logout button */}
+              <button
+                onClick={handleLogout}
+                disabled={isWorking}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: isDark ? '#374151' : '#111827' }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6 pb-8">
-        <div className="admin-dashboard-layout grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] gap-6 items-start">
-          <aside className="admin-sidebar hidden lg:block bg-white rounded-xl border border-gray-200 shadow-sm p-4 lg:sticky lg:top-24 space-y-5">
-            <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-                Admin Sections
-              </h2>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex gap-6">
+          {/* Sidebar Overlay for mobile */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          {/* Sidebar */}
+          <aside
+            className={`
+              fixed lg:sticky top-0 lg:top-24 left-0 z-50 lg:z-0
+              w-72 lg:w-64 h-screen lg:h-auto max-h-[calc(100vh-6rem)]
+              lg:rounded-2xl shadow-xl lg:shadow-sm
+              transform transition-transform duration-300
+              ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+              overflow-y-auto
+            `}
+            style={{
+              backgroundColor: isDark ? '#1f2937' : '#ffffff',
+              borderRight: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+              borderWidth: '1px',
+              borderColor: isDark ? '#374151' : '#e5e7eb'
+            }}
+          >
+            {/* Mobile close button */}
+            <div 
+              className="lg:hidden flex items-center justify-between p-4"
+              style={{ borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}
+            >
+              <span 
+                className="font-semibold"
+                style={{ color: isDark ? '#ffffff' : '#111827' }}
+              >
+                Menu
+              </span>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="p-2 rounded-lg"
+                style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
-            <div className="space-y-4">
+            <nav className="p-4 space-y-6">
               {adminSectionGroups.map((group) => (
-                <div key={group.label} className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    {group.label}
-                  </p>
-
+                <div key={group.label}>
+                  <div className="flex items-center gap-2 px-3 mb-3">
+                    <span style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>{group.icon}</span>
+                    <span 
+                      className="text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: isDark ? '#6b7280' : '#9ca3af' }}
+                    >
+                      {group.label}
+                    </span>
+                  </div>
                   <div className="space-y-1">
-                    {group.sections.map((section) => (
-                      <button
-                        key={section.key}
-                        type="button"
-                        onClick={() => {
-                          clearMessages();
-                          setActiveSection(section.key);
-                        }}
-                        aria-current={activeSection === section.key ? 'page' : undefined}
-                        className={`admin-sidebar-item w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                          activeSection === section.key
-                            ? 'bg-blue-100 text-blue-800 font-semibold'
-                            : 'text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        {section.label}
-                      </button>
-                    ))}
+                    {group.sections.map((section) => {
+                      const isActive = activeSection === section.key;
+                      return (
+                        <button
+                          key={section.key}
+                          onClick={() => {
+                            clearMessages();
+                            setActiveSection(section.key);
+                            setSidebarOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium"
+                          style={{
+                            backgroundColor: isActive 
+                              ? '#2563eb' 
+                              : 'transparent',
+                            color: isActive 
+                              ? '#ffffff' 
+                              : (isDark ? '#9ca3af' : '#4b5563'),
+                          }}
+                        >
+                          <SectionIcon name={section.icon} className="w-5 h-5" />
+                          <span>{section.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
-            </div>
+            </nav>
           </aside>
 
-          <div className="admin-content space-y-6">
+          {/* Main Content */}
+          <main className="flex-1 min-w-0 space-y-6">
+            {/* Messages */}
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-4 py-3">
-                {error}
+              <div 
+                className="flex items-center gap-3 p-4 rounded-xl animate-slideDown"
+                style={{
+                  backgroundColor: isDark ? 'rgba(127, 29, 29, 0.2)' : '#fef2f2',
+                  border: `1px solid ${isDark ? 'rgba(127, 29, 29, 0.5)' : '#fecaca'}`,
+                  color: isDark ? '#f87171' : '#dc2626'
+                }}
+              >
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm">{error}</span>
+                <button 
+                  onClick={() => setError('')} 
+                  className="ml-auto p-1 rounded"
+                  style={{ 
+                    backgroundColor: isDark ? 'rgba(127, 29, 29, 0.3)' : '#fee2e2'
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             )}
 
             {successMessage && (
-              <div className="rounded-lg border border-green-200 bg-green-50 text-green-700 px-4 py-3">
-                {successMessage}
+              <div 
+                className="flex items-center gap-3 p-4 rounded-xl animate-slideDown"
+                style={{
+                  backgroundColor: isDark ? 'rgba(6, 78, 59, 0.2)' : '#f0fdf4',
+                  border: `1px solid ${isDark ? 'rgba(6, 78, 59, 0.5)' : '#bbf7d0'}`,
+                  color: isDark ? '#4ade80' : '#16a34a'
+                }}
+              >
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm">{successMessage}</span>
+                <button 
+                  onClick={() => setSuccessMessage('')} 
+                  className="ml-auto p-1 rounded"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(6, 78, 59, 0.3)' : '#dcfce7'
+                  }}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
             )}
 
-            <div className="admin-panel admin-section-header bg-white rounded-xl border border-gray-200 shadow-sm p-4 md:p-5 space-y-3">
+            {/* Section Header */}
+            <AdminCard
+              title={sectionDetails[activeSection]?.title || 'Admin Section'}
+              subtitle={sectionDetails[activeSection]?.description || ''}
+              icon={<SectionIcon name={adminSectionGroups.flatMap(g => g.sections).find(s => s.key === activeSection)?.icon || 'settings'} />}
+            >
+              {/* Mobile section selector */}
               <div className="lg:hidden">
-                <label htmlFor="active-admin-section" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                  Current Section
-                </label>
                 <select
-                  id="active-admin-section"
                   value={activeSection}
-                  onChange={(event) => {
+                  onChange={(e) => {
                     clearMessages();
-                    setActiveSection(event.target.value);
+                    setActiveSection(e.target.value);
                   }}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm"
+                  style={{
+                    backgroundColor: isDark ? '#374151' : '#f9fafb',
+                    border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`,
+                    color: isDark ? '#ffffff' : '#111827'
+                  }}
                 >
                   {adminSectionGroups.map((group) => (
                     <optgroup key={group.label} label={group.label}>
@@ -1980,3937 +2429,2010 @@ const AdminDashboard = () => {
                   ))}
                 </select>
               </div>
+            </AdminCard>
 
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {sectionDetails[activeSection]?.title || 'Admin Section'}
-                </h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  {sectionDetails[activeSection]?.description || ''}
-                </p>
-              </div>
-            </div>
-
+            {/* Site Settings Section */}
             {activeSection === 'site-settings' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">Site Settings</h2>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <label className="text-sm text-gray-700">
-              Site Name
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.site_name}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    site_name: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Department Name
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.department_name}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    department_name: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Logo URL
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.logo_url}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    logo_url: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Upload Logo
-              <input
-                className="mt-1 block"
-                type="file"
-                accept="image/*"
-                onChange={(event) =>
-                  uploadImage(event.target.files?.[0], 'ce', (uploadedUrl) => {
-                    setSiteSettings((previous) => ({
-                      ...previous,
-                      logo_url: uploadedUrl,
-                    }));
-                  })
-                }
-              />
-            </label>
-
-            {siteSettings.logo_url && (
-              <div className="md:col-span-2">
-                <img
-                  src={resolveMediaUrl(siteSettings.logo_url)}
-                  alt="Current logo"
-                  className="h-16 w-auto object-contain border border-gray-200 rounded"
-                />
-              </div>
-            )}
-
-            <label className="text-sm text-gray-700">
-              Navbar Title
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.navbar_title}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    navbar_title: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Navbar Subtitle
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.navbar_subtitle}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    navbar_subtitle: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Footer Description
-              <textarea
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                value={siteSettings.footer_description}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    footer_description: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Contact Address (one line per row)
-              <textarea
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                value={siteSettings.contact_address_lines_text}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    contact_address_lines_text: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Contact Phone
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.contact_phone}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    contact_phone: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Contact Email
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.contact_email}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    contact_email: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Google Map Embed URL
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.map_embed_url}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    map_embed_url: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Copyright Text
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={siteSettings.copyright_text}
-                onChange={(event) =>
-                  setSiteSettings((previous) => ({
-                    ...previous,
-                    copyright_text: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          </div>
-
-          <button
-            type="button"
-            onClick={saveSiteSettings}
-            disabled={isWorking}
-            className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
-          >
-            Save Site Settings
-          </button>
-              </section>
-            )}
-
-            {activeSection === 'home-content' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-          <h2 className="text-xl font-semibold text-gray-900">Home Content</h2>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Welcome Title
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.welcome_title}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    welcome_title: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Welcome Paragraph 1
-              <textarea
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                value={homeContent.welcome_paragraph_1}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    welcome_paragraph_1: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Welcome Paragraph 2
-              <textarea
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                value={homeContent.welcome_paragraph_2}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    welcome_paragraph_2: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Welcome Image URL
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.welcome_image_url}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    welcome_image_url: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              Upload Welcome Image
-              <input
-                className="mt-1 block"
-                type="file"
-                accept="image/*"
-                onChange={(event) =>
-                  uploadImage(event.target.files?.[0], 'home', (uploadedUrl) => {
-                    setHomeContent((previous) => ({
-                      ...previous,
-                      welcome_image_url: uploadedUrl,
-                    }));
-                  })
-                }
-              />
-            </label>
-
-            {homeContent.welcome_image_url && (
-              <div className="md:col-span-2">
-                <img
-                  src={resolveMediaUrl(homeContent.welcome_image_url)}
-                  alt="Welcome"
-                  className="h-40 w-full object-cover border border-gray-200 rounded"
-                />
-              </div>
-            )}
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              CTA Title
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.cta_title}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    cta_title: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700 md:col-span-2">
-              CTA Description
-              <textarea
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                value={homeContent.cta_description}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    cta_description: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Primary CTA Text
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.cta_primary_text}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    cta_primary_text: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Primary CTA Link
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.cta_primary_link}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    cta_primary_link: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Secondary CTA Text
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.cta_secondary_text}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    cta_secondary_text: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Secondary CTA Link
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.cta_secondary_link}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    cta_secondary_link: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Tertiary CTA Text
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.cta_tertiary_text}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    cta_tertiary_text: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            <label className="text-sm text-gray-700">
-              Tertiary CTA Link
-              <input
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                value={homeContent.cta_tertiary_link}
-                onChange={(event) =>
-                  setHomeContent((previous) => ({
-                    ...previous,
-                    cta_tertiary_link: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          </div>
-
-          <button
-            type="button"
-            onClick={saveHomeContent}
-            disabled={isWorking}
-            className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
-          >
-            Save Home Content
-          </button>
-              </section>
-            )}
-
-            {activeSection === 'navigation' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Navigation Items</h2>
-            <button
-              type="button"
-              onClick={() =>
-                setNavigationItems((previous) => [...previous, { ...defaultNavigationItem }])
-              }
-              className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm font-medium"
-            >
-              Add Item
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {navigationItems.map((item, index) => (
-              <div key={`navigation-${item.id || index}`} className="admin-entry-card border border-gray-200 rounded-lg p-4">
-                <div className="grid md:grid-cols-4 gap-3">
-                  <input
-                    placeholder="Label"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.label}
-                    onChange={(event) =>
-                      setNavigationItems((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, label: event.target.value }
-                            : entry
-                        )
-                      )
+              <AdminCard
+                title="Site Settings"
+                subtitle="View and manage site-wide configuration"
+                actions={
+                  <AdminButton
+                    variant="primary"
+                    onClick={() => setSiteSettingsEditMode(true)}
+                    icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
                     }
-                  />
-                  <input
-                    placeholder="Href"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.href}
-                    onChange={(event) =>
-                      setNavigationItems((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, href: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    type="number"
-                    placeholder="Sort"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.sort_order}
-                    onChange={(event) =>
-                      setNavigationItems((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, sort_order: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.is_active)}
-                      onChange={(event) =>
-                        setNavigationItems((previous) =>
-                          previous.map((entry, currentIndex) =>
-                            currentIndex === index
-                              ? { ...entry, is_active: event.target.checked ? 1 : 0 }
-                              : entry
-                          )
-                        )
-                      }
-                    />
-                    Active
-                  </label>
-                </div>
-
-                <div className="flex gap-2 mt-3">
-                  <button
-                    type="button"
-                    onClick={() => saveNavigationItem(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-sm disabled:bg-blue-400"
                   >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeNavigationItem(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm disabled:bg-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-              </section>
-            )}
-
-            {activeSection === 'about-content' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">About Content</h2>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={aboutContent.hero_title}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          hero_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={aboutContent.hero_subtitle}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          hero_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Story Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={aboutContent.story_title}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          story_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Story Paragraph 1
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                      value={aboutContent.story_paragraph_1}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          story_paragraph_1: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Story Paragraph 2
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                      value={aboutContent.story_paragraph_2}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          story_paragraph_2: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Story Paragraph 3
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                      value={aboutContent.story_paragraph_3}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          story_paragraph_3: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Story Image URL
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={aboutContent.story_image_url}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          story_image_url: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Upload Story Image
-                    <input
-                      className="mt-1 block"
-                      type="file"
-                      accept="image/*"
-                      onChange={(event) =>
-                        uploadImage(event.target.files?.[0], 'about', (uploadedUrl) => {
-                          setAboutContent((previous) => ({
-                            ...previous,
-                            story_image_url: uploadedUrl,
-                          }));
-                        })
-                      }
-                    />
-                  </label>
-
-                  {aboutContent.story_image_url && (
-                    <div className="md:col-span-2">
-                      <img
-                        src={resolveMediaUrl(aboutContent.story_image_url)}
-                        alt="About story"
-                        className="h-40 w-full object-cover border border-gray-200 rounded"
-                      />
-                    </div>
-                  )}
-
-                  <label className="text-sm text-gray-700">
-                    Mission Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={aboutContent.mission_title}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          mission_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Vision Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={aboutContent.vision_title}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          vision_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Mission Description
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                      value={aboutContent.mission_description}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          mission_description: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Vision Description
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                      value={aboutContent.vision_description}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          vision_description: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Values Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={aboutContent.values_title}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          values_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Values Section Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={aboutContent.values_subtitle}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          values_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Core Values Items</h3>
-                      <button
-                        type="button"
-                        onClick={() => addAboutListItem('values_items', defaultAboutValueItem)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Value
-                      </button>
-                    </div>
-
-                    {(Array.isArray(aboutContent.values_items) ? aboutContent.values_items : []).length === 0 && (
-                      <p className="text-xs text-gray-500">No values added yet.</p>
-                    )}
-
-                    {(Array.isArray(aboutContent.values_items) ? aboutContent.values_items : []).map((item, index) => (
-                      <div key={`about-value-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
-                        <label className="text-xs text-gray-700 md:col-span-2">
-                          Icon
-                          <select
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={item.icon_name || 'Award'}
-                            onChange={(event) =>
-                              updateAboutListItem('values_items', index, {
-                                icon_name: event.target.value,
-                              })
-                            }
-                          >
-                            {aboutValueIconOptions.map((iconName) => (
-                              <option key={iconName} value={iconName}>
-                                {iconName}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-3">
-                          Title
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={item.title || ''}
-                            onChange={(event) =>
-                              updateAboutListItem('values_items', index, {
-                                title: event.target.value,
-                              })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-6">
-                          Description
-                          <textarea
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm"
-                            value={item.description || ''}
-                            onChange={(event) =>
-                              updateAboutListItem('values_items', index, {
-                                description: event.target.value,
-                              })
-                            }
-                          />
-                        </label>
-
-                        <div className="md:col-span-1 flex items-end">
-                          <button
-                            type="button"
-                            onClick={() => removeAboutListItem('values_items', index)}
-                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Milestones Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={aboutContent.milestones_title}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          milestones_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Milestones Section Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={aboutContent.milestones_subtitle}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          milestones_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Milestones</h3>
-                      <button
-                        type="button"
-                        onClick={() => addAboutListItem('milestones', defaultAboutMilestoneItem)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Milestone
-                      </button>
-                    </div>
-
-                    {(Array.isArray(aboutContent.milestones) ? aboutContent.milestones : []).length === 0 && (
-                      <p className="text-xs text-gray-500">No milestones added yet.</p>
-                    )}
-
-                    {(Array.isArray(aboutContent.milestones) ? aboutContent.milestones : []).map((item, index) => (
-                      <div key={`about-milestone-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
-                        <label className="text-xs text-gray-700 md:col-span-3">
-                          Year
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={item.year || ''}
-                            onChange={(event) =>
-                              updateAboutListItem('milestones', index, {
-                                year: event.target.value,
-                              })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-8">
-                          Event
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={item.event || ''}
-                            onChange={(event) =>
-                              updateAboutListItem('milestones', index, {
-                                event: event.target.value,
-                              })
-                            }
-                          />
-                        </label>
-
-                        <div className="md:col-span-1 flex items-end">
-                          <button
-                            type="button"
-                            onClick={() => removeAboutListItem('milestones', index)}
-                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Stats Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={aboutContent.stats_title}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          stats_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Stats Section Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={aboutContent.stats_subtitle}
-                      onChange={(event) =>
-                        setAboutContent((previous) => ({
-                          ...previous,
-                          stats_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Stats Items</h3>
-                      <button
-                        type="button"
-                        onClick={() => addAboutListItem('stats_items', defaultAboutStatItem)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Stat
-                      </button>
-                    </div>
-
-                    {(Array.isArray(aboutContent.stats_items) ? aboutContent.stats_items : []).length === 0 && (
-                      <p className="text-xs text-gray-500">No stats added yet.</p>
-                    )}
-
-                    {(Array.isArray(aboutContent.stats_items) ? aboutContent.stats_items : []).map((item, index) => (
-                      <div key={`about-stat-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
-                        <label className="text-xs text-gray-700 md:col-span-5">
-                          Label
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={item.label || ''}
-                            onChange={(event) =>
-                              updateAboutListItem('stats_items', index, {
-                                label: event.target.value,
-                              })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-3">
+                    Edit Settings
+                  </AdminButton>
+                }
+                noPadding
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr style={{ backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#f9fafb' }}>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider"
+                          style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
+                        >
+                          Setting
+                        </th>
+                        <th 
+                          className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider"
+                          style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
+                        >
                           Value
-                          <input
-                            type="number"
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={item.value ?? 0}
-                            onChange={(event) =>
-                              updateAboutListItem('stats_items', index, {
-                                value: toInteger(event.target.value, 0),
-                              })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-3">
-                          Suffix
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={item.suffix || ''}
-                            onChange={(event) =>
-                              updateAboutListItem('stats_items', index, {
-                                suffix: event.target.value,
-                              })
-                            }
-                          />
-                        </label>
-
-                        <div className="md:col-span-1 flex items-end">
-                          <button
-                            type="button"
-                            onClick={() => removeAboutListItem('stats_items', index)}
-                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={saveAboutContent}
-                  disabled={isWorking}
-                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
-                >
-                  Save About Content
-                </button>
-              </section>
-            )}
-
-            {activeSection === 'academics-content' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Academics Content</h2>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.hero_title}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          hero_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={academicsContent.hero_subtitle}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          hero_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Programs Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.programs_title}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          programs_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Programs Section Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={academicsContent.programs_subtitle}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          programs_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Programs</h3>
-                      <button
-                        type="button"
-                        onClick={addAcademicsProgram}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Program
-                      </button>
-                    </div>
-
-                    {(Array.isArray(academicsContent.programs) ? academicsContent.programs : []).map((program, index) => (
-                      <div key={`academics-program-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
-                        <label className="text-xs text-gray-700 md:col-span-6">
-                          Program Title
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={program.title || ''}
-                            onChange={(event) =>
-                              updateAcademicsProgram(index, { title: event.target.value })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-4">
-                          Link URL (optional)
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={program.link_url || ''}
-                            onChange={(event) =>
-                              updateAcademicsProgram(index, { link_url: event.target.value })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-2">
-                          Link Target
-                          <select
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={program.link_target || '_blank'}
-                            onChange={(event) =>
-                              updateAcademicsProgram(index, { link_target: event.target.value })
-                            }
-                          >
-                            <option value="_blank">New Tab</option>
-                            <option value="_self">Same Tab</option>
-                          </select>
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-3">
-                          Duration
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={program.duration || ''}
-                            onChange={(event) =>
-                              updateAcademicsProgram(index, { duration: event.target.value })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-4">
-                          Intake (optional)
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={program.intake || ''}
-                            onChange={(event) =>
-                              updateAcademicsProgram(index, { intake: event.target.value })
-                            }
-                          />
-                        </label>
-
-                        <div className="md:col-span-5 flex items-end">
-                          <button
-                            type="button"
-                            onClick={() => removeAcademicsProgram(index)}
-                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
-                          >
-                            Remove Program
-                          </button>
-                        </div>
-
-                        <label className="text-xs text-gray-700 md:col-span-12">
-                          Description
-                          <textarea
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm"
-                            value={program.description || ''}
-                            onChange={(event) =>
-                              updateAcademicsProgram(index, { description: event.target.value })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-6">
-                          Highlights (one per line)
-                          <textarea
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-24 text-sm"
-                            value={formatMultilineList(program.highlights)}
-                            onChange={(event) =>
-                              updateAcademicsProgram(index, {
-                                highlights: parseMultilineList(event.target.value),
-                              })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-6">
-                          Courses (one per line)
-                          <textarea
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-24 text-sm"
-                            value={formatMultilineList(program.courses)}
-                            onChange={(event) =>
-                              updateAcademicsProgram(index, {
-                                courses: parseMultilineList(event.target.value),
-                              })
-                            }
-                          />
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Curriculum Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.curriculum_title}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          curriculum_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Curriculum Section Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={academicsContent.curriculum_subtitle}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          curriculum_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Curriculum Semesters</h3>
-                      <button
-                        type="button"
-                        onClick={addAcademicsSemester}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Semester
-                      </button>
-                    </div>
-
-                    {(Array.isArray(academicsContent.curriculum_semesters)
-                      ? academicsContent.curriculum_semesters
-                      : []
-                    ).map((semester, index) => (
-                      <div key={`academics-semester-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-3">
-                        <label className="text-xs text-gray-700 md:col-span-4">
-                          Semester Label
-                          <input
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                            value={semester.semester_label || ''}
-                            onChange={(event) =>
-                              updateAcademicsSemester(index, {
-                                semester_label: event.target.value,
-                              })
-                            }
-                          />
-                        </label>
-
-                        <label className="text-xs text-gray-700 md:col-span-7">
-                          Courses (one per line)
-                          <textarea
-                            className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-24 text-sm"
-                            value={formatMultilineList(semester.courses)}
-                            onChange={(event) =>
-                              updateAcademicsSemester(index, {
-                                courses: parseMultilineList(event.target.value),
-                              })
-                            }
-                          />
-                        </label>
-
-                        <div className="md:col-span-1 flex items-end">
-                          <button
-                            type="button"
-                            onClick={() => removeAcademicsSemester(index)}
-                            className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Facilities Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.facilities_title}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          facilities_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Facilities Section Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={academicsContent.facilities_subtitle}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          facilities_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Facilities (one per line)
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-28"
-                      value={formatMultilineList(academicsContent.facilities_items)}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          facilities_items: parseMultilineList(event.target.value),
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Admission Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.admission_title}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          admission_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Admission Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={academicsContent.admission_subtitle}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          admission_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Primary Button Text
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.admission_primary_text}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          admission_primary_text: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Primary Button Link
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.admission_primary_link}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          admission_primary_link: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Secondary Button Text
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.admission_secondary_text}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          admission_secondary_text: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Secondary Button Link
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={academicsContent.admission_secondary_link}
-                      onChange={(event) =>
-                        setAcademicsContent((previous) => ({
-                          ...previous,
-                          admission_secondary_link: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={saveAcademicsContent}
-                  disabled={isWorking}
-                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
-                >
-                  Save Academics Content
-                </button>
-              </section>
-            )}
-
-            {activeSection === 'contact-content' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Contact Content</h2>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={contactContent.hero_title}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          hero_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={contactContent.hero_subtitle}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          hero_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Info Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={contactContent.info_section_title}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          info_section_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Info Section Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={contactContent.info_section_subtitle}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          info_section_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Contact Info Cards</h3>
-                      <button
-                        type="button"
-                        onClick={() => addContactListItem('contact_info_cards', defaultContactInfoCard)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Card
-                      </button>
-                    </div>
-
-                    {(Array.isArray(contactContent.contact_info_cards)
-                      ? contactContent.contact_info_cards
-                      : []
-                    ).map((item, index) => (
-                      <div key={`contact-card-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
-                        <select
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
-                          value={item.icon_name || 'MapPin'}
-                          onChange={(event) =>
-                            updateContactListItem('contact_info_cards', index, {
-                              icon_name: event.target.value,
-                            })
-                          }
-                        >
-                          {contactInfoIconOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-7"
-                          placeholder="Card Title"
-                          value={item.title || ''}
-                          onChange={(event) =>
-                            updateContactListItem('contact_info_cards', index, {
-                              title: event.target.value,
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeContactListItem('contact_info_cards', index)}
-                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
-                        >
-                          Remove
-                        </button>
-
-                        <textarea
-                          className="rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm md:col-span-12"
-                          placeholder="Details (one per line)"
-                          value={formatMultilineList(item.details)}
-                          onChange={(event) =>
-                            updateContactListItem('contact_info_cards', index, {
-                              details: parseMultilineList(event.target.value),
-                            })
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Form Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={contactContent.form_title}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          form_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Form Submit Message
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={contactContent.form_submit_message}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          form_submit_message: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Form Categories (one per line)
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-24"
-                      value={formatMultilineList(contactContent.form_categories)}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          form_categories: parseMultilineList(event.target.value),
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Key Contacts Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={contactContent.key_contacts_title}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          key_contacts_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Key Contacts Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={contactContent.key_contacts_subtitle}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          key_contacts_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Key Contacts</h3>
-                      <button
-                        type="button"
-                        onClick={() => addContactListItem('key_contacts', defaultKeyContact)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Contact
-                      </button>
-                    </div>
-
-                    {(Array.isArray(contactContent.key_contacts) ? contactContent.key_contacts : []).map(
-                      (item, index) => (
-                        <div key={`key-contact-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                            placeholder="Name"
-                            value={item.name || ''}
-                            onChange={(event) =>
-                              updateContactListItem('key_contacts', index, {
-                                name: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                            placeholder="Designation"
-                            value={item.designation || ''}
-                            onChange={(event) =>
-                              updateContactListItem('key_contacts', index, {
-                                designation: event.target.value,
-                              })
-                            }
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeContactListItem('key_contacts', index)}
-                            className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-4"
-                          >
-                            Remove
-                          </button>
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                            placeholder="Email"
-                            value={item.email || ''}
-                            onChange={(event) =>
-                              updateContactListItem('key_contacts', index, {
-                                email: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                            placeholder="Phone"
-                            value={item.phone || ''}
-                            onChange={(event) =>
-                              updateContactListItem('key_contacts', index, {
-                                phone: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                            placeholder="Office"
-                            value={item.office || ''}
-                            onChange={(event) =>
-                              updateContactListItem('key_contacts', index, {
-                                office: event.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      ),
-                    )}
-                  </div>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Quick Links Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={contactContent.quick_links_title}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          quick_links_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Quick Links Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={contactContent.quick_links_subtitle}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          quick_links_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Quick Links</h3>
-                      <button
-                        type="button"
-                        onClick={() => addContactListItem('quick_links', defaultQuickLinkItem)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Quick Link
-                      </button>
-                    </div>
-
-                    {(Array.isArray(contactContent.quick_links) ? contactContent.quick_links : []).map(
-                      (item, index) => (
-                        <div key={`quick-link-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                            placeholder="Title"
-                            value={item.title || ''}
-                            onChange={(event) =>
-                              updateContactListItem('quick_links', index, {
-                                title: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-6"
-                            placeholder="Description"
-                            value={item.description || ''}
-                            onChange={(event) =>
-                              updateContactListItem('quick_links', index, {
-                                description: event.target.value,
-                              })
-                            }
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeContactListItem('quick_links', index)}
-                            className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
-                          >
-                            Remove
-                          </button>
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-12"
-                            placeholder="URL (optional)"
-                            value={item.url || ''}
-                            onChange={(event) =>
-                              updateContactListItem('quick_links', index, {
-                                url: event.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      ),
-                    )}
-                  </div>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Stay Connected Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={contactContent.stay_connected_title}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          stay_connected_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Stay Connected Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={contactContent.stay_connected_subtitle}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          stay_connected_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Stay Connected Links</h3>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          addContactListItem('stay_connected_links', defaultStayConnectedLink)
-                        }
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Link
-                      </button>
-                    </div>
-
-                    {(Array.isArray(contactContent.stay_connected_links)
-                      ? contactContent.stay_connected_links
-                      : []
-                    ).map((item, index) => (
-                      <div key={`stay-link-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
-                        <select
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
-                          value={item.icon_name || 'Globe'}
-                          onChange={(event) =>
-                            updateContactListItem('stay_connected_links', index, {
-                              icon_name: event.target.value,
-                            })
-                          }
-                        >
-                          {contactInfoIconOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                          placeholder="Label"
-                          value={item.label || ''}
-                          onChange={(event) =>
-                            updateContactListItem('stay_connected_links', index, {
-                              label: event.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                          placeholder="URL"
-                          value={item.url || ''}
-                          onChange={(event) =>
-                            updateContactListItem('stay_connected_links', index, {
-                              url: event.target.value,
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeContactListItem('stay_connected_links', index)}
-                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-1"
-                        >
-                          X
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Bottom Info Cards</h3>
-                      <button
-                        type="button"
-                        onClick={() => addContactListItem('footer_cards', defaultFooterCard)}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Card
-                      </button>
-                    </div>
-
-                    {(Array.isArray(contactContent.footer_cards) ? contactContent.footer_cards : []).map(
-                      (item, index) => (
-                        <div key={`contact-footer-card-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                            placeholder="Title"
-                            value={item.title || ''}
-                            onChange={(event) =>
-                              updateContactListItem('footer_cards', index, {
-                                title: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-6"
-                            placeholder="Description"
-                            value={item.description || ''}
-                            onChange={(event) =>
-                              updateContactListItem('footer_cards', index, {
-                                description: event.target.value,
-                              })
-                            }
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeContactListItem('footer_cards', index)}
-                            className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ),
-                    )}
-                  </div>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Map Embed URL
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={contactContent.map_embed_url}
-                      onChange={(event) =>
-                        setContactContent((previous) => ({
-                          ...previous,
-                          map_embed_url: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={saveContactContent}
-                  disabled={isWorking}
-                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
-                >
-                  Save Contact Content
-                </button>
-              </section>
-            )}
-
-            {activeSection === 'events-content' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Events Content</h2>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={eventsContent.hero_title}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          hero_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={eventsContent.hero_subtitle}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          hero_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Search Placeholder
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={eventsContent.search_placeholder}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          search_placeholder: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    News Tab Label
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={eventsContent.tab_news_label}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          tab_news_label: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Upcoming Tab Label
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={eventsContent.tab_upcoming_label}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          tab_upcoming_label: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Past Tab Label
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={eventsContent.tab_past_label}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          tab_past_label: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Empty Message (News)
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={eventsContent.no_news_message}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          no_news_message: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Empty Message (Upcoming)
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={eventsContent.no_upcoming_message}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          no_upcoming_message: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Empty Message (Past)
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={eventsContent.no_past_message}
-                      onChange={(event) =>
-                        setEventsContent((previous) => ({
-                          ...previous,
-                          no_past_message: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Upcoming Events</h3>
-                      <button
-                        type="button"
-                        onClick={() => addEventsListItem('upcoming_events')}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Upcoming Event
-                      </button>
-                    </div>
-
-                    {(Array.isArray(eventsContent.upcoming_events)
-                      ? eventsContent.upcoming_events
-                      : []
-                    ).map((item, index) => (
-                      <div key={`upcoming-event-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
-                        <input
-                          type="date"
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-2"
-                          value={item.date || ''}
-                          onChange={(event) =>
-                            updateEventsListItem('upcoming_events', index, {
-                              date: event.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
-                          placeholder="Event Title"
-                          value={item.title || ''}
-                          onChange={(event) =>
-                            updateEventsListItem('upcoming_events', index, {
-                              title: event.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-2"
-                          placeholder="Category"
-                          value={item.category || ''}
-                          onChange={(event) =>
-                            updateEventsListItem('upcoming_events', index, {
-                              category: event.target.value,
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeEventsListItem('upcoming_events', index)}
-                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-3"
-                        >
-                          Remove
-                        </button>
-
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                          placeholder="Time (optional)"
-                          value={item.time || ''}
-                          onChange={(event) =>
-                            updateEventsListItem('upcoming_events', index, {
-                              time: event.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
-                          placeholder="Venue (optional)"
-                          value={item.venue || ''}
-                          onChange={(event) =>
-                            updateEventsListItem('upcoming_events', index, {
-                              venue: event.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
-                          placeholder="Registration Link (optional)"
-                          value={item.registration_link || ''}
-                          onChange={(event) =>
-                            updateEventsListItem('upcoming_events', index, {
-                              registration_link: event.target.value,
-                            })
-                          }
-                        />
-
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-8"
-                          placeholder="Image URL (optional)"
-                          value={item.image_url || ''}
-                          onChange={(event) =>
-                            updateEventsListItem('upcoming_events', index, {
-                              image_url: event.target.value,
-                            })
-                          }
-                        />
-                        <label className="text-xs text-gray-700 md:col-span-4">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="block w-full text-xs"
-                            onChange={(event) =>
-                              uploadImage(event.target.files?.[0], 'events', (uploadedUrl) => {
-                                updateEventsListItem('upcoming_events', index, {
-                                  image_url: uploadedUrl,
-                                });
-                              })
-                            }
-                          />
-                        </label>
-
-                        <textarea
-                          className="rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm md:col-span-12"
-                          placeholder="Description"
-                          value={item.description || ''}
-                          onChange={(event) =>
-                            updateEventsListItem('upcoming_events', index, {
-                              description: event.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Past Events</h3>
-                      <button
-                        type="button"
-                        onClick={() => addEventsListItem('past_events')}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Past Event
-                      </button>
-                    </div>
-
-                    {(Array.isArray(eventsContent.past_events) ? eventsContent.past_events : []).map(
-                      (item, index) => (
-                        <div key={`past-event-${index}`} className="rounded-lg border border-gray-200 p-3 grid md:grid-cols-12 gap-2">
-                          <input
-                            type="date"
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-2"
-                            value={item.date || ''}
-                            onChange={(event) =>
-                              updateEventsListItem('past_events', index, {
-                                date: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
-                            placeholder="Event Title"
-                            value={item.title || ''}
-                            onChange={(event) =>
-                              updateEventsListItem('past_events', index, {
-                                title: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-2"
-                            placeholder="Category"
-                            value={item.category || ''}
-                            onChange={(event) =>
-                              updateEventsListItem('past_events', index, {
-                                category: event.target.value,
-                              })
-                            }
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeEventsListItem('past_events', index)}
-                            className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-3"
-                          >
-                            Remove
-                          </button>
-
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-4"
-                            placeholder="Time (optional)"
-                            value={item.time || ''}
-                            onChange={(event) =>
-                              updateEventsListItem('past_events', index, {
-                                time: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
-                            placeholder="Venue (optional)"
-                            value={item.venue || ''}
-                            onChange={(event) =>
-                              updateEventsListItem('past_events', index, {
-                                venue: event.target.value,
-                              })
-                            }
-                          />
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
-                            placeholder="Registration Link (optional)"
-                            value={item.registration_link || ''}
-                            onChange={(event) =>
-                              updateEventsListItem('past_events', index, {
-                                registration_link: event.target.value,
-                              })
-                            }
-                          />
-
-                          <input
-                            className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-8"
-                            placeholder="Image URL (optional)"
-                            value={item.image_url || ''}
-                            onChange={(event) =>
-                              updateEventsListItem('past_events', index, {
-                                image_url: event.target.value,
-                              })
-                            }
-                          />
-                          <label className="text-xs text-gray-700 md:col-span-4">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="block w-full text-xs"
-                              onChange={(event) =>
-                                uploadImage(event.target.files?.[0], 'events', (uploadedUrl) => {
-                                  updateEventsListItem('past_events', index, {
-                                    image_url: uploadedUrl,
-                                  });
-                                })
-                              }
-                            />
-                          </label>
-
-                          <textarea
-                            className="rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm md:col-span-12"
-                            placeholder="Description"
-                            value={item.description || ''}
-                            onChange={(event) =>
-                              updateEventsListItem('past_events', index, {
-                                description: event.target.value,
-                              })
-                            }
-                          />
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={saveEventsContent}
-                  disabled={isWorking}
-                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
-                >
-                  Save Events Content
-                </button>
-              </section>
-            )}
-
-            {activeSection === 'specializations-content' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-                <h2 className="text-xl font-semibold text-gray-900">Specializations Content</h2>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={specializationsContent.hero_title}
-                      onChange={(event) =>
-                        setSpecializationsContent((previous) => ({
-                          ...previous,
-                          hero_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Hero Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={specializationsContent.hero_subtitle}
-                      onChange={(event) =>
-                        setSpecializationsContent((previous) => ({
-                          ...previous,
-                          hero_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Specializations Tab Label
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={specializationsContent.specializations_tab_label}
-                      onChange={(event) =>
-                        setSpecializationsContent((previous) => ({
-                          ...previous,
-                          specializations_tab_label: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700">
-                    Laboratories Tab Label
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={specializationsContent.laboratories_tab_label}
-                      onChange={(event) =>
-                        setSpecializationsContent((previous) => ({
-                          ...previous,
-                          laboratories_tab_label: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Specializations Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={specializationsContent.specializations_title}
-                      onChange={(event) =>
-                        setSpecializationsContent((previous) => ({
-                          ...previous,
-                          specializations_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Specializations Section Subtitle
-                    <textarea
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                      value={specializationsContent.specializations_subtitle}
-                      onChange={(event) =>
-                        setSpecializationsContent((previous) => ({
-                          ...previous,
-                          specializations_subtitle: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <label className="text-sm text-gray-700 md:col-span-2">
-                    Laboratories Section Title
-                    <input
-                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                      value={specializationsContent.laboratories_title}
-                      onChange={(event) =>
-                        setSpecializationsContent((previous) => ({
-                          ...previous,
-                          laboratories_title: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Specialization Cards</h3>
-                      <button
-                        type="button"
-                        onClick={addSpecializationItem}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Specialization
-                      </button>
-                    </div>
-
-                    {(Array.isArray(specializationsContent.specializations)
-                      ? specializationsContent.specializations
-                      : []
-                    ).map((item, index) => (
-                      <div key={`specialization-${index}`} className="rounded-lg border border-gray-200 p-3 space-y-3">
-                        <div className="grid md:grid-cols-12 gap-3">
-                          <label className="text-xs text-gray-700 md:col-span-2">
-                            Key
-                            <input
-                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                              value={item.key || ''}
-                              onChange={(event) =>
-                                updateSpecializationItem(index, {
-                                  key: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-
-                          <label className="text-xs text-gray-700 md:col-span-4">
-                            Title
-                            <input
-                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                              value={item.title || ''}
-                              onChange={(event) =>
-                                updateSpecializationItem(index, {
-                                  title: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-
-                          <label className="text-xs text-gray-700 md:col-span-2">
-                            Color
-                            <select
-                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                              value={item.color || 'blue'}
-                              onChange={(event) =>
-                                updateSpecializationItem(index, {
-                                  color: event.target.value,
-                                })
-                              }
-                            >
-                              {specializationColorOptions.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-
-                          <label className="text-xs text-gray-700 md:col-span-2">
-                            Icon
-                            <select
-                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                              value={item.icon_name || 'Building'}
-                              onChange={(event) =>
-                                updateSpecializationItem(index, {
-                                  icon_name: event.target.value,
-                                })
-                              }
-                            >
-                              {specializationIconOptions.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-
-                          <div className="md:col-span-2 flex items-end">
-                            <button
-                              type="button"
-                              onClick={() => removeSpecializationItem(index)}
-                              className="w-full px-2 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
-                            >
-                              Remove
-                            </button>
-                          </div>
-
-                          <label className="text-xs text-gray-700 md:col-span-8">
-                            Banner Image URL
-                            <input
-                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
-                              value={item.image_url || ''}
-                              onChange={(event) =>
-                                updateSpecializationItem(index, {
-                                  image_url: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-
-                          <label className="text-xs text-gray-700 md:col-span-4">
-                            Upload Banner Image
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="mt-1 block w-full text-xs"
-                              onChange={(event) =>
-                                uploadImage(event.target.files?.[0], 'specializations', (url) =>
-                                  updateSpecializationItem(index, {
-                                    image_url: url,
-                                  }),
-                                )
-                              }
-                            />
-                          </label>
-
-                          <label className="text-xs text-gray-700 md:col-span-12">
-                            Description
-                            <textarea
-                              className="mt-1 w-full rounded-lg border border-gray-300 px-2 py-2 min-h-20 text-sm"
-                              value={item.description || ''}
-                              onChange={(event) =>
-                                updateSpecializationItem(index, {
-                                  description: event.target.value,
-                                })
-                              }
-                            />
-                          </label>
-
-                          <div className="md:col-span-12 rounded-lg border border-gray-200 p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-semibold text-gray-700">Faculty Members</h4>
-                              <button
-                                type="button"
-                                onClick={() => addSpecializationFaculty(index)}
-                                className="px-2 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs"
-                              >
-                                Add Faculty
-                              </button>
-                            </div>
-
-                            {(Array.isArray(item.faculty) ? item.faculty : []).map((faculty, facultyIndex) => (
-                              <div key={`specialization-faculty-${index}-${facultyIndex}`} className="grid md:grid-cols-12 gap-2">
-                                <input
-                                  className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
-                                  placeholder="Faculty Name"
-                                  value={faculty.name || ''}
-                                  onChange={(event) =>
-                                    updateSpecializationFaculty(index, facultyIndex, {
-                                      name: event.target.value,
-                                    })
-                                  }
-                                />
-                                <input
-                                  className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-6"
-                                  placeholder="Profile URL (optional)"
-                                  value={faculty.url || ''}
-                                  onChange={(event) =>
-                                    updateSpecializationFaculty(index, facultyIndex, {
-                                      url: event.target.value,
-                                    })
-                                  }
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => removeSpecializationFaculty(index, facultyIndex)}
-                                  className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-1"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="md:col-span-12 rounded-lg border border-gray-200 p-3 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <h4 className="text-xs font-semibold text-gray-700">Laboratories and Equipment</h4>
-                              <button
-                                type="button"
-                                onClick={() => addSpecializationLab(index)}
-                                className="px-2 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs"
-                              >
-                                Add Lab
-                              </button>
-                            </div>
-
-                            {(Array.isArray(item.labs) ? item.labs : []).map((lab, labIndex) => (
-                              <div key={`specialization-lab-${index}-${labIndex}`} className="rounded-lg border border-gray-200 p-3 space-y-2">
-                                <div className="grid md:grid-cols-12 gap-2">
-                                  <input
-                                    className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-10"
-                                    placeholder="Lab Name"
-                                    value={lab.name || ''}
-                                    onChange={(event) =>
-                                      updateSpecializationLab(index, labIndex, {
-                                        name: event.target.value,
-                                      })
-                                    }
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeSpecializationLab(index, labIndex)}
-                                    className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
-                                  >
-                                    Remove Lab
-                                  </button>
-                                </div>
-
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-xs font-semibold text-gray-700">Equipment List</p>
-                                    <button
-                                      type="button"
-                                      onClick={() => addSpecializationEquipment(index, labIndex)}
-                                      className="px-2 py-1 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs"
-                                    >
-                                      Add Equipment
-                                    </button>
-                                  </div>
-
-                                  {(Array.isArray(lab.equipments) ? lab.equipments : []).map(
-                                    (equipment, equipmentIndex) => (
-                                      <div
-                                        key={`specialization-equipment-${index}-${labIndex}-${equipmentIndex}`}
-                                        className="grid md:grid-cols-12 gap-2"
-                                      >
-                                        <input
-                                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-3"
-                                          placeholder="Equipment Name"
-                                          value={equipment.name || ''}
-                                          onChange={(event) =>
-                                            updateSpecializationEquipment(
-                                              index,
-                                              labIndex,
-                                              equipmentIndex,
-                                              {
-                                                name: event.target.value,
-                                              },
-                                            )
-                                          }
-                                        />
-                                        <input
-                                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
-                                          placeholder="Equipment Image URL"
-                                          value={equipment.image_url || ''}
-                                          onChange={(event) =>
-                                            updateSpecializationEquipment(
-                                              index,
-                                              labIndex,
-                                              equipmentIndex,
-                                              {
-                                                image_url: event.target.value,
-                                              },
-                                            )
-                                          }
-                                        />
-                                        <label className="text-xs text-gray-700 md:col-span-3">
-                                          <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="block w-full text-xs"
-                                            onChange={(event) =>
-                                              uploadImage(
-                                                event.target.files?.[0],
-                                                'instruments',
-                                                (url) =>
-                                                  updateSpecializationEquipment(
-                                                    index,
-                                                    labIndex,
-                                                    equipmentIndex,
-                                                    {
-                                                      image_url: url,
-                                                    },
-                                                  ),
-                                              )
-                                            }
-                                          />
-                                        </label>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            removeSpecializationEquipment(
-                                              index,
-                                              labIndex,
-                                              equipmentIndex,
-                                            )
-                                          }
-                                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-1"
-                                        >
-                                          X
-                                        </button>
-                                      </div>
-                                    ),
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="md:col-span-2 rounded-lg border border-gray-200 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-gray-800">Laboratories Table</h3>
-                      <button
-                        type="button"
-                        onClick={addLaboratoryRow}
-                        className="px-3 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 text-xs font-medium"
-                      >
-                        Add Row
-                      </button>
-                    </div>
-
-                    {(Array.isArray(specializationsContent.laboratory_rows)
-                      ? specializationsContent.laboratory_rows
-                      : []
-                    ).map((row, index) => (
-                      <div key={`specialization-row-${index}`} className="grid md:grid-cols-12 gap-2">
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
-                          placeholder="Laboratory Name"
-                          value={row.name || ''}
-                          onChange={(event) =>
-                            updateLaboratoryRow(index, {
-                              name: event.target.value,
-                            })
-                          }
-                        />
-                        <input
-                          className="rounded-lg border border-gray-300 px-2 py-2 text-sm md:col-span-5"
-                          placeholder="Location"
-                          value={row.location || ''}
-                          onChange={(event) =>
-                            updateLaboratoryRow(index, {
-                              location: event.target.value,
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeLaboratoryRow(index)}
-                          className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-2 md:col-span-2"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={saveSpecializationsContent}
-                  disabled={isWorking}
-                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg font-medium disabled:bg-blue-400"
-                >
-                  Save Specializations Content
-                </button>
-              </section>
-            )}
-
-            {activeSection === 'social' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Social Links</h2>
-            <button
-              type="button"
-              onClick={() => setSocialLinks((previous) => [...previous, { ...defaultSocialLink }])}
-              className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm font-medium"
-            >
-              Add Link
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {socialLinks.map((item, index) => (
-              <div key={`social-${item.id || index}`} className="admin-entry-card border border-gray-200 rounded-lg p-4">
-                <div className="grid md:grid-cols-5 gap-3">
-                  <input
-                    placeholder="Platform"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.platform}
-                    onChange={(event) =>
-                      setSocialLinks((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, platform: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    placeholder="Icon name"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.icon}
-                    onChange={(event) =>
-                      setSocialLinks((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, icon: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    placeholder="URL"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.url}
-                    onChange={(event) =>
-                      setSocialLinks((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, url: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    type="number"
-                    placeholder="Sort"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.sort_order}
-                    onChange={(event) =>
-                      setSocialLinks((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, sort_order: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.is_active)}
-                      onChange={(event) =>
-                        setSocialLinks((previous) =>
-                          previous.map((entry, currentIndex) =>
-                            currentIndex === index
-                              ? { ...entry, is_active: event.target.checked ? 1 : 0 }
-                              : entry
-                          )
-                        )
-                      }
-                    />
-                    Active
-                  </label>
-                </div>
-
-                <div className="flex gap-2 mt-3">
-                  <button
-                    type="button"
-                    onClick={() => saveSocialLink(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-sm disabled:bg-blue-400"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeSocialLink(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm disabled:bg-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-              </section>
-            )}
-
-            {activeSection === 'footer' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Footer Links</h2>
-            <button
-              type="button"
-              onClick={() => setFooterLinks((previous) => [...previous, { ...defaultFooterLink }])}
-              className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm font-medium"
-            >
-              Add Link
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {footerLinks.map((item, index) => (
-              <div key={`footer-${item.id || index}`} className="admin-entry-card border border-gray-200 rounded-lg p-4">
-                <div className="grid md:grid-cols-5 gap-3">
-                  <select
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.section}
-                    onChange={(event) =>
-                      setFooterLinks((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, section: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  >
-                    <option value="quick">quick</option>
-                    <option value="important">important</option>
-                  </select>
-                  <input
-                    placeholder="Label"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.label}
-                    onChange={(event) =>
-                      setFooterLinks((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, label: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    placeholder="Href"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.href}
-                    onChange={(event) =>
-                      setFooterLinks((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, href: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    type="number"
-                    placeholder="Sort"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.sort_order}
-                    onChange={(event) =>
-                      setFooterLinks((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, sort_order: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.is_active)}
-                      onChange={(event) =>
-                        setFooterLinks((previous) =>
-                          previous.map((entry, currentIndex) =>
-                            currentIndex === index
-                              ? { ...entry, is_active: event.target.checked ? 1 : 0 }
-                              : entry
-                          )
-                        )
-                      }
-                    />
-                    Active
-                  </label>
-                </div>
-
-                <div className="flex gap-2 mt-3">
-                  <button
-                    type="button"
-                    onClick={() => saveFooterLink(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-sm disabled:bg-blue-400"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeFooterLink(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm disabled:bg-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-              </section>
-            )}
-
-            {activeSection === 'slides' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Hero Slides</h2>
-            <button
-              type="button"
-              onClick={() => setSlides((previous) => [...previous, { ...defaultSlide }])}
-              className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm font-medium"
-            >
-              Add Slide
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {slides.map((item, index) => (
-              <div key={`slide-${item.id || index}`} className="admin-entry-card border border-gray-200 rounded-lg p-4 space-y-3">
-                <div className="grid md:grid-cols-2 gap-3">
-                  <input
-                    placeholder="Title"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.title}
-                    onChange={(event) =>
-                      setSlides((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, title: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    placeholder="CTA text"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.cta_text}
-                    onChange={(event) =>
-                      setSlides((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, cta_text: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                </div>
-
-                <textarea
-                  placeholder="Subtitle"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                  value={item.subtitle}
-                  onChange={(event) =>
-                    setSlides((previous) =>
-                      previous.map((entry, currentIndex) =>
-                        currentIndex === index
-                          ? { ...entry, subtitle: event.target.value }
-                          : entry
-                      )
-                    )
-                  }
-                />
-
-                <div className="grid md:grid-cols-3 gap-3">
-                  <input
-                    placeholder="CTA link"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.cta_link}
-                    onChange={(event) =>
-                      setSlides((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, cta_link: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    type="number"
-                    placeholder="Sort"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.sort_order}
-                    onChange={(event) =>
-                      setSlides((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, sort_order: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.is_active)}
-                      onChange={(event) =>
-                        setSlides((previous) =>
-                          previous.map((entry, currentIndex) =>
-                            currentIndex === index
-                              ? { ...entry, is_active: event.target.checked ? 1 : 0 }
-                              : entry
-                          )
-                        )
-                      }
-                    />
-                    Active
-                  </label>
-                </div>
-
-                <input
-                  placeholder="Image URL"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                  value={item.image_url}
-                  onChange={(event) =>
-                    setSlides((previous) =>
-                      previous.map((entry, currentIndex) =>
-                        currentIndex === index
-                          ? { ...entry, image_url: event.target.value }
-                          : entry
-                      )
-                    )
-                  }
-                />
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) =>
-                    uploadImage(event.target.files?.[0], 'home', (uploadedUrl) => {
-                      setSlides((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, image_url: uploadedUrl }
-                            : entry
-                        )
-                      );
-                    })
-                  }
-                />
-
-                {item.image_url && (
-                  <img
-                    src={resolveMediaUrl(item.image_url)}
-                    alt={item.title || 'Slide image'}
-                    className="h-32 w-full object-cover rounded border border-gray-200"
-                  />
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => saveSlide(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-sm disabled:bg-blue-400"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeSlide(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm disabled:bg-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-              </section>
-            )}
-
-            {activeSection === 'stats' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">Home Stats</h2>
-            <button
-              type="button"
-              onClick={() => setStats((previous) => [...previous, { ...defaultStat }])}
-              className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm font-medium"
-            >
-              Add Stat
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {stats.map((item, index) => (
-              <div key={`stat-${item.id || index}`} className="admin-entry-card border border-gray-200 rounded-lg p-4">
-                <div className="grid md:grid-cols-6 gap-3">
-                  <input
-                    placeholder="Label"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.label}
-                    onChange={(event) =>
-                      setStats((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, label: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    type="number"
-                    placeholder="Value"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.value}
-                    onChange={(event) =>
-                      setStats((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, value: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    placeholder="Suffix"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.suffix}
-                    onChange={(event) =>
-                      setStats((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, suffix: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    placeholder="Icon Name"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.icon_name}
-                    onChange={(event) =>
-                      setStats((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, icon_name: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    type="number"
-                    placeholder="Sort"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.sort_order}
-                    onChange={(event) =>
-                      setStats((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, sort_order: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.is_active)}
-                      onChange={(event) =>
-                        setStats((previous) =>
-                          previous.map((entry, currentIndex) =>
-                            currentIndex === index
-                              ? { ...entry, is_active: event.target.checked ? 1 : 0 }
-                              : entry
-                          )
-                        )
-                      }
-                    />
-                    Active
-                  </label>
-                </div>
-
-                <div className="flex gap-2 mt-3">
-                  <button
-                    type="button"
-                    onClick={() => saveStat(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-sm disabled:bg-blue-400"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeStat(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm disabled:bg-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-              </section>
-            )}
-
-            {activeSection === 'news' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900">News Items</h2>
-            <button
-              type="button"
-              onClick={() =>
-                setNewsItems((previous) => [
-                  ...previous,
-                  {
-                    ...defaultNewsItem,
-                    publish_date: formatDateTimeLocal(new Date().toISOString()),
-                  },
-                ])
-              }
-              className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm font-medium"
-            >
-              Add News
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {newsItems.map((item, index) => (
-              <div key={`news-${item.id || index}`} className="admin-entry-card border border-gray-200 rounded-lg p-4 space-y-3">
-                <div className="grid md:grid-cols-2 gap-3">
-                  <input
-                    placeholder="Title"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.title}
-                    onChange={(event) =>
-                      setNewsItems((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, title: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    placeholder="Category"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.category}
-                    onChange={(event) =>
-                      setNewsItems((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, category: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                </div>
-
-                <textarea
-                  placeholder="Excerpt"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 min-h-20"
-                  value={item.excerpt}
-                  onChange={(event) =>
-                    setNewsItems((previous) =>
-                      previous.map((entry, currentIndex) =>
-                        currentIndex === index
-                          ? { ...entry, excerpt: event.target.value }
-                          : entry
-                      )
-                    )
-                  }
-                />
-
-                <div className="grid md:grid-cols-3 gap-3">
-                  <input
-                    placeholder="External link"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.external_link || ''}
-                    onChange={(event) =>
-                      setNewsItems((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, external_link: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <input
-                    type="datetime-local"
-                    className="rounded-lg border border-gray-300 px-3 py-2"
-                    value={item.publish_date || ''}
-                    onChange={(event) =>
-                      setNewsItems((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, publish_date: event.target.value }
-                            : entry
-                        )
-                      )
-                    }
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(item.is_active)}
-                      onChange={(event) =>
-                        setNewsItems((previous) =>
-                          previous.map((entry, currentIndex) =>
-                            currentIndex === index
-                              ? { ...entry, is_active: event.target.checked ? 1 : 0 }
-                              : entry
-                          )
-                        )
-                      }
-                    />
-                    Active
-                  </label>
-                </div>
-
-                <input
-                  placeholder="Image URL (optional)"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                  value={item.image_url || ''}
-                  onChange={(event) =>
-                    setNewsItems((previous) =>
-                      previous.map((entry, currentIndex) =>
-                        currentIndex === index
-                          ? { ...entry, image_url: event.target.value }
-                          : entry
-                      )
-                    )
-                  }
-                />
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) =>
-                    uploadImage(event.target.files?.[0], 'events', (uploadedUrl) => {
-                      setNewsItems((previous) =>
-                        previous.map((entry, currentIndex) =>
-                          currentIndex === index
-                            ? { ...entry, image_url: uploadedUrl }
-                            : entry
-                        )
-                      );
-                    })
-                  }
-                />
-
-                {item.image_url && (
-                  <img
-                    src={resolveMediaUrl(item.image_url)}
-                    alt={item.title || 'News image'}
-                    className="h-32 w-full object-cover rounded border border-gray-200"
-                  />
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => saveNews(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-blue-800 hover:bg-blue-900 text-white rounded-lg text-sm disabled:bg-blue-400"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeNews(item)}
-                    disabled={isWorking}
-                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm disabled:bg-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-              </section>
-            )}
-
-            {activeSection === 'people' && (
-              <section className="admin-panel bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">People Directory</h2>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Use one table for faculty, staff, Ph.D. profiles, and M.Tech/B.Tech list links.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={openCreatePeopleModal}
-                    disabled={isWorking}
-                    className="px-3 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white text-sm font-medium disabled:bg-blue-400"
-                  >
-                    Add Entry
-                  </button>
-                </div>
-
-                <div className="admin-people-table-wrap overflow-x-auto border border-gray-200 rounded-lg">
-                  <table className="admin-people-table min-w-full text-sm">
-                    <thead className="bg-gray-100 text-gray-700">
-                      <tr>
-                        <th className="text-left px-3 py-2 font-semibold">Category</th>
-                        <th className="text-left px-3 py-2 font-semibold">Name / Year</th>
-                        <th className="text-left px-3 py-2 font-semibold">Designation / Dept.</th>
-                        <th className="text-left px-3 py-2 font-semibold">Email / Link</th>
-                        <th className="text-left px-3 py-2 font-semibold">Sort</th>
-                        <th className="text-left px-3 py-2 font-semibold">Active</th>
-                        <th className="text-left px-3 py-2 font-semibold">Actions</th>
+                        </th>
                       </tr>
                     </thead>
-
                     <tbody>
-                      {peopleEntries.map((entry) => (
-                        <tr key={`people-${entry.id}`} className="border-t border-gray-200">
-                          <td className="px-3 py-2 uppercase tracking-wide text-xs font-semibold text-gray-600">
-                            {entry.category}
+                      {siteSettingsTableData.map((item, index) => (
+                        <tr
+                          key={item.key}
+                          className="cursor-pointer"
+                          style={{ 
+                            borderTop: index > 0 ? `1px solid ${isDark ? '#374151' : '#e5e7eb'}` : 'none'
+                          }}
+                          onClick={() => setSiteSettingsModalOpen(true)}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(55, 65, 81, 0.3)' : '#f9fafb'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span 
+                              className="text-sm font-medium"
+                              style={{ color: isDark ? '#ffffff' : '#111827' }}
+                            >
+                              {item.label}
+                            </span>
                           </td>
-                          <td className="px-3 py-2 text-gray-800 font-medium">
-                            {entry.name || entry.year_label || '-'}
-                          </td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {entry.designation || entry.department || entry.specialization || '-'}
-                          </td>
-                          <td className="px-3 py-2 text-gray-700 break-all">
-                            {entry.email || entry.resource_link || '-'}
-                          </td>
-                          <td className="px-3 py-2 text-gray-700">{entry.sort_order}</td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {entry.is_active ? 'Yes' : 'No'}
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openEditPeopleModal(entry)}
-                                disabled={isWorking}
-                                className="px-2 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50"
+                          <td className="px-6 py-4">
+                            {item.type === 'image' && item.value ? (
+                              <img
+                                src={resolveMediaUrl(item.value)}
+                                alt={item.label}
+                                className="h-10 w-auto object-contain rounded"
+                                style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}
+                              />
+                            ) : item.type === 'textarea' ? (
+                              <span 
+                                className="text-sm line-clamp-2"
+                                style={{ color: isDark ? '#9ca3af' : '#4b5563' }}
                               >
-                                Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removePeople(entry)}
-                                disabled={isWorking}
-                                className="px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
+                                {item.value || '-'}
+                              </span>
+                            ) : (
+                              <span 
+                                className="text-sm"
+                                style={{ color: isDark ? '#9ca3af' : '#4b5563' }}
                               >
-                                Delete
-                              </button>
-                            </div>
+                                {item.value || '-'}
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
-
-                      {peopleEntries.length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
-                            No people entries available.
-                          </td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
-              </section>
+              </AdminCard>
             )}
 
-            {isPeopleModalOpen && (
-              <div className="admin-modal-backdrop" role="presentation" onClick={closePeopleModal}>
-                <div className="admin-modal-card" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-                  <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {editingPeopleId ? 'Edit People Entry' : 'Add People Entry'}
-                    </h3>
-
-                    <button
-                      type="button"
-                      onClick={closePeopleModal}
-                      className="text-sm text-gray-500 hover:text-gray-700"
+            {/* Site Settings View Modal */}
+            <AdminModal
+              isOpen={siteSettingsModalOpen && !siteSettingsEditMode}
+              onClose={() => setSiteSettingsModalOpen(false)}
+              title="Site Settings Details"
+              size="lg"
+              footer={
+                <div className="flex justify-end gap-3">
+                  <AdminButton
+                    variant="warning"
+                    onClick={() => setSiteSettingsEditMode(true)}
+                    icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    }
+                  >
+                    Edit
+                  </AdminButton>
+                  <AdminButton variant="secondary" onClick={() => setSiteSettingsModalOpen(false)}>
+                    Close
+                  </AdminButton>
+                </div>
+              }
+            >
+              <div className="space-y-6">
+                {siteSettingsTableData.map((item) => (
+                  <div key={item.key} className="space-y-1">
+                    <label 
+                      className="text-sm font-medium"
+                      style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
                     >
-                      Close
-                    </button>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-3 mt-4">
-                    <label className="text-sm text-gray-700">
-                      Category
-                      <select
-                        className="mt-1"
-                        value={peopleDraft.category}
-                        onChange={(event) =>
-                          setPeopleDraft((previous) => ({
-                            ...previous,
-                            category: event.target.value,
-                          }))
-                        }
+                      {item.label}
+                    </label>
+                    {item.type === 'image' && item.value ? (
+                      <div>
+                        <img
+                          src={resolveMediaUrl(item.value)}
+                          alt={item.label}
+                          className="h-16 w-auto object-contain rounded-lg"
+                          style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}
+                        />
+                        <p 
+                          className="text-xs mt-1"
+                          style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
+                        >
+                          {item.value}
+                        </p>
+                      </div>
+                    ) : item.type === 'textarea' ? (
+                      <p 
+                        className="text-sm whitespace-pre-wrap p-3 rounded-lg"
+                        style={{ 
+                          color: isDark ? '#ffffff' : '#111827',
+                          backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#f9fafb'
+                        }}
                       >
-                        {peopleCategoryOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="text-sm text-gray-700">
-                      Sort Order
-                      <input
-                        type="number"
-                        className="mt-1"
-                        value={peopleDraft.sort_order}
-                        onChange={(event) =>
-                          setPeopleDraft((previous) => ({
-                            ...previous,
-                            sort_order: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-
-                    {(peopleDraft.category === 'mtech' || peopleDraft.category === 'btech') && (
-                      <>
-                        <label className="text-sm text-gray-700">
-                          Year Label
-                          <input
-                            className="mt-1"
-                            value={peopleDraft.year_label}
-                            onChange={(event) =>
-                              setPeopleDraft((previous) => ({
-                                ...previous,
-                                year_label: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-
-                        <label className="text-sm text-gray-700 md:col-span-2">
-                          List Link
-                          <input
-                            className="mt-1"
-                            value={peopleDraft.resource_link}
-                            onChange={(event) =>
-                              setPeopleDraft((previous) => ({
-                                ...previous,
-                                resource_link: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-                      </>
+                        {item.value || '-'}
+                      </p>
+                    ) : (
+                      <p 
+                        className="text-sm"
+                        style={{ color: isDark ? '#ffffff' : '#111827' }}
+                      >
+                        {item.value || '-'}
+                      </p>
                     )}
-
-                    {peopleDraft.category !== 'mtech' && peopleDraft.category !== 'btech' && (
-                      <>
-                        <label className="text-sm text-gray-700">
-                          Name
-                          <input
-                            className="mt-1"
-                            value={peopleDraft.name}
-                            onChange={(event) =>
-                              setPeopleDraft((previous) => ({
-                                ...previous,
-                                name: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-
-                        <label className="text-sm text-gray-700">
-                          Designation
-                          <input
-                            className="mt-1"
-                            value={peopleDraft.designation}
-                            onChange={(event) =>
-                              setPeopleDraft((previous) => ({
-                                ...previous,
-                                designation: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-
-                        {peopleDraft.category === 'faculty' && (
-                          <label className="text-sm text-gray-700">
-                            Specialization
-                            <input
-                              className="mt-1"
-                              value={peopleDraft.specialization}
-                              onChange={(event) =>
-                                setPeopleDraft((previous) => ({
-                                  ...previous,
-                                  specialization: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                        )}
-
-                        {peopleDraft.category === 'staff' && (
-                          <label className="text-sm text-gray-700">
-                            Department
-                            <input
-                              className="mt-1"
-                              value={peopleDraft.department}
-                              onChange={(event) =>
-                                setPeopleDraft((previous) => ({
-                                  ...previous,
-                                  department: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                        )}
-
-                        <label className="text-sm text-gray-700">
-                          Email
-                          <input
-                            className="mt-1"
-                            value={peopleDraft.email}
-                            onChange={(event) =>
-                              setPeopleDraft((previous) => ({
-                                ...previous,
-                                email: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-
-                        <label className="text-sm text-gray-700">
-                          Phone
-                          <input
-                            className="mt-1"
-                            value={peopleDraft.phone}
-                            onChange={(event) =>
-                              setPeopleDraft((previous) => ({
-                                ...previous,
-                                phone: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-
-                        {peopleDraft.category === 'faculty' && (
-                          <label className="text-sm text-gray-700">
-                            Room
-                            <input
-                              className="mt-1"
-                              value={peopleDraft.room}
-                              onChange={(event) =>
-                                setPeopleDraft((previous) => ({
-                                  ...previous,
-                                  room: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                        )}
-
-                        {(peopleDraft.category === 'faculty' || peopleDraft.category === 'staff') && (
-                          <label className="text-sm text-gray-700 md:col-span-2">
-                            Profile URL
-                            <input
-                              className="mt-1"
-                              value={peopleDraft.profile_url}
-                              onChange={(event) =>
-                                setPeopleDraft((previous) => ({
-                                  ...previous,
-                                  profile_url: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                        )}
-
-                        <label className="text-sm text-gray-700 md:col-span-2">
-                          Image URL
-                          <input
-                            className="mt-1"
-                            value={peopleDraft.image_url}
-                            onChange={(event) =>
-                              setPeopleDraft((previous) => ({
-                                ...previous,
-                                image_url: event.target.value,
-                              }))
-                            }
-                          />
-                        </label>
-
-                        <label className="text-sm text-gray-700 md:col-span-2">
-                          Upload Image
-                          <input
-                            className="mt-1"
-                            type="file"
-                            accept="image/*"
-                            onChange={(event) =>
-                              uploadImage(event.target.files?.[0], 'people', (uploadedUrl) => {
-                                setPeopleDraft((previous) => ({
-                                  ...previous,
-                                  image_url: uploadedUrl,
-                                }));
-                              })
-                            }
-                          />
-                        </label>
-
-                        {peopleDraft.image_url && (
-                          <div className="md:col-span-2">
-                            <img
-                              src={resolveMediaUrl(peopleDraft.image_url)}
-                              alt={peopleDraft.name || 'People image preview'}
-                              className="h-40 w-full object-contain border border-gray-200 rounded"
-                            />
-                          </div>
-                        )}
-
-                        {peopleDraft.category === 'faculty' && (
-                          <label className="text-sm text-gray-700 md:col-span-2">
-                            Research Interests (one per line)
-                            <textarea
-                              className="mt-1"
-                              value={peopleDraft.research_interests_text}
-                              onChange={(event) =>
-                                setPeopleDraft((previous) => ({
-                                  ...previous,
-                                  research_interests_text: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                        )}
-
-                        {peopleDraft.category === 'staff' && (
-                          <label className="text-sm text-gray-700 md:col-span-2">
-                            Responsibilities (one per line)
-                            <textarea
-                              className="mt-1"
-                              value={peopleDraft.responsibilities_text}
-                              onChange={(event) =>
-                                setPeopleDraft((previous) => ({
-                                  ...previous,
-                                  responsibilities_text: event.target.value,
-                                }))
-                              }
-                            />
-                          </label>
-                        )}
-                      </>
-                    )}
-
-                    <label className="text-sm text-gray-700 md:col-span-2 flex items-center gap-2 mt-1">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(peopleDraft.is_active)}
-                        onChange={(event) =>
-                          setPeopleDraft((previous) => ({
-                            ...previous,
-                            is_active: event.target.checked ? 1 : 0,
-                          }))
-                        }
-                      />
-                      Active
-                    </label>
                   </div>
+                ))}
+              </div>
+            </AdminModal>
 
-                  <div className="flex items-center justify-end gap-2 mt-5">
-                    <button
-                      type="button"
-                      onClick={closePeopleModal}
-                      disabled={isWorking}
-                      className="px-3 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm font-medium"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={savePeopleEntry}
-                      disabled={isWorking}
-                      className="px-3 py-2 rounded-lg bg-blue-800 hover:bg-blue-900 text-white text-sm font-medium disabled:bg-blue-400"
-                    >
-                      {editingPeopleId ? 'Save Changes' : 'Create Entry'}
-                    </button>
+            {/* Site Settings Edit Modal */}
+            <AdminModal
+              isOpen={siteSettingsEditMode}
+              onClose={() => setSiteSettingsEditMode(false)}
+              title="Edit Site Settings"
+              size="lg"
+              footer={
+                <div className="flex justify-end gap-3">
+                  <AdminButton
+                    variant="secondary"
+                    onClick={() => setSiteSettingsEditMode(false)}
+                    disabled={isWorking}
+                  >
+                    Cancel
+                  </AdminButton>
+                  <AdminButton
+                    variant="primary"
+                    onClick={() => setSiteSettingsConfirmSave(true)}
+                    loading={isWorking}
+                  >
+                    Save Changes
+                  </AdminButton>
+                </div>
+              }
+            >
+              <div className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <AdminInput
+                    label="Site Name"
+                    value={siteSettings.site_name}
+                    onChange={(e) => setSiteSettings((prev) => ({ ...prev, site_name: e.target.value }))}
+                    placeholder="Enter site name"
+                  />
+                  <AdminInput
+                    label="Department Name"
+                    value={siteSettings.department_name}
+                    onChange={(e) => setSiteSettings((prev) => ({ ...prev, department_name: e.target.value }))}
+                    placeholder="Enter department name"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <AdminInput
+                    label="Logo URL"
+                    value={siteSettings.logo_url}
+                    onChange={(e) => setSiteSettings((prev) => ({ ...prev, logo_url: e.target.value }))}
+                    placeholder="Enter logo URL or upload below"
+                  />
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        uploadImage(e.target.files?.[0], 'ce', (url) =>
+                          setSiteSettings((prev) => ({ ...prev, logo_url: url }))
+                        )
+                      }
+                      className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer"
+                      style={{
+                        color: isDark ? '#9ca3af' : '#4b5563'
+                      }}
+                    />
+                    {siteSettings.logo_url && (
+                      <img
+                        src={resolveMediaUrl(siteSettings.logo_url)}
+                        alt="Logo preview"
+                        className="h-12 w-auto object-contain rounded"
+                        style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}
+                      />
+                    )}
                   </div>
                 </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <AdminInput
+                    label="Navbar Title"
+                    value={siteSettings.navbar_title}
+                    onChange={(e) => setSiteSettings((prev) => ({ ...prev, navbar_title: e.target.value }))}
+                    placeholder="Enter navbar title"
+                  />
+                  <AdminInput
+                    label="Navbar Subtitle"
+                    value={siteSettings.navbar_subtitle}
+                    onChange={(e) => setSiteSettings((prev) => ({ ...prev, navbar_subtitle: e.target.value }))}
+                    placeholder="Enter navbar subtitle"
+                  />
+                </div>
+
+                <AdminTextarea
+                  label="Footer Description"
+                  value={siteSettings.footer_description}
+                  onChange={(e) => setSiteSettings((prev) => ({ ...prev, footer_description: e.target.value }))}
+                  placeholder="Enter footer description"
+                  rows={3}
+                />
+
+                <AdminTextarea
+                  label="Contact Address (one line per row)"
+                  value={siteSettings.contact_address_lines_text}
+                  onChange={(e) => setSiteSettings((prev) => ({ ...prev, contact_address_lines_text: e.target.value }))}
+                  placeholder="Enter address lines"
+                  rows={3}
+                />
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <AdminInput
+                    label="Contact Phone"
+                    value={siteSettings.contact_phone}
+                    onChange={(e) => setSiteSettings((prev) => ({ ...prev, contact_phone: e.target.value }))}
+                    placeholder="Enter contact phone"
+                  />
+                  <AdminInput
+                    label="Contact Email"
+                    value={siteSettings.contact_email}
+                    onChange={(e) => setSiteSettings((prev) => ({ ...prev, contact_email: e.target.value }))}
+                    placeholder="Enter contact email"
+                  />
+                </div>
+
+                <AdminInput
+                  label="Google Map Embed URL"
+                  value={siteSettings.map_embed_url}
+                  onChange={(e) => setSiteSettings((prev) => ({ ...prev, map_embed_url: e.target.value }))}
+                  placeholder="Enter map embed URL"
+                />
+
+                <AdminInput
+                  label="Copyright Text"
+                  value={siteSettings.copyright_text}
+                  onChange={(e) => setSiteSettings((prev) => ({ ...prev, copyright_text: e.target.value }))}
+                  placeholder="Enter copyright text"
+                />
               </div>
+            </AdminModal>
+
+            {/* Save Confirmation Modal */}
+            <ConfirmationModal
+              isOpen={siteSettingsConfirmSave}
+              onClose={() => setSiteSettingsConfirmSave(false)}
+              onConfirm={saveSiteSettings}
+              title="Confirm Save"
+              message="Are you sure you want to save these changes to site settings?"
+              confirmText="Save Changes"
+              variant="info"
+              isLoading={isWorking}
+            />
+
+            {/* ============================================ */}
+            {/* HOME CONTENT SECTION */}
+            {/* ============================================ */}
+            {activeSection === 'home-content' && (
+              <>
+                <AdminCard
+                  title="Home Content"
+                  subtitle="Welcome block and CTA text for the homepage"
+                  actions={
+                    <AdminButton
+                      variant="primary"
+                      onClick={() => setHomeContentEditMode(true)}
+                      icon={
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      }
+                    >
+                      Edit Content
+                    </AdminButton>
+                  }
+                >
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Welcome Title</p>
+                        <p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{homeContent.welcome_title || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Welcome Paragraph 1</p>
+                        <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{homeContent.welcome_paragraph_1 || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Welcome Paragraph 2</p>
+                        <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{homeContent.welcome_paragraph_2 || '-'}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>CTA Title</p>
+                        <p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{homeContent.cta_title || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>CTA Description</p>
+                        <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{homeContent.cta_description || '-'}</p>
+                      </div>
+                      {homeContent.welcome_image_url && (
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wider mb-2" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Welcome Image</p>
+                          <img 
+                            src={resolveMediaUrl(homeContent.welcome_image_url)} 
+                            alt="Welcome" 
+                            className="h-24 w-auto rounded-lg object-cover"
+                            style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </AdminCard>
+
+                {/* Home Content Edit Modal */}
+                <AdminModal
+                  isOpen={homeContentEditMode}
+                  onClose={() => setHomeContentEditMode(false)}
+                  title="Edit Home Content"
+                  size="lg"
+                  footer={
+                    <div className="flex justify-end gap-3">
+                      <AdminButton variant="secondary" onClick={() => setHomeContentEditMode(false)} disabled={isWorking}>
+                        Cancel
+                      </AdminButton>
+                      <AdminButton variant="primary" onClick={() => setHomeContentConfirmSave(true)} loading={isWorking}>
+                        Save Changes
+                      </AdminButton>
+                    </div>
+                  }
+                >
+                  <div className="space-y-4">
+                    <AdminInput
+                      label="Welcome Title"
+                      value={homeContent.welcome_title}
+                      onChange={(e) => setHomeContent((prev) => ({ ...prev, welcome_title: e.target.value }))}
+                      placeholder="Enter welcome title"
+                    />
+                    <AdminTextarea
+                      label="Welcome Paragraph 1"
+                      value={homeContent.welcome_paragraph_1}
+                      onChange={(e) => setHomeContent((prev) => ({ ...prev, welcome_paragraph_1: e.target.value }))}
+                      placeholder="Enter first paragraph"
+                      rows={3}
+                    />
+                    <AdminTextarea
+                      label="Welcome Paragraph 2"
+                      value={homeContent.welcome_paragraph_2}
+                      onChange={(e) => setHomeContent((prev) => ({ ...prev, welcome_paragraph_2: e.target.value }))}
+                      placeholder="Enter second paragraph"
+                      rows={3}
+                    />
+                    <div className="space-y-2">
+                      <AdminInput
+                        label="Welcome Image URL"
+                        value={homeContent.welcome_image_url}
+                        onChange={(e) => setHomeContent((prev) => ({ ...prev, welcome_image_url: e.target.value }))}
+                        placeholder="Enter image URL or upload"
+                      />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => uploadImage(e.target.files?.[0], 'home', (url) => setHomeContent((prev) => ({ ...prev, welcome_image_url: url })))}
+                        className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer"
+                        style={{ color: isDark ? '#9ca3af' : '#4b5563' }}
+                      />
+                    </div>
+                    <div className="pt-4" style={{ borderTop: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h4 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Call to Action</h4>
+                      <div className="space-y-4">
+                        <AdminInput
+                          label="CTA Title"
+                          value={homeContent.cta_title}
+                          onChange={(e) => setHomeContent((prev) => ({ ...prev, cta_title: e.target.value }))}
+                          placeholder="Enter CTA title"
+                        />
+                        <AdminTextarea
+                          label="CTA Description"
+                          value={homeContent.cta_description}
+                          onChange={(e) => setHomeContent((prev) => ({ ...prev, cta_description: e.target.value }))}
+                          placeholder="Enter CTA description"
+                          rows={2}
+                        />
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <AdminInput
+                            label="Primary Button Text"
+                            value={homeContent.cta_primary_text}
+                            onChange={(e) => setHomeContent((prev) => ({ ...prev, cta_primary_text: e.target.value }))}
+                          />
+                          <AdminInput
+                            label="Primary Button Link"
+                            value={homeContent.cta_primary_link}
+                            onChange={(e) => setHomeContent((prev) => ({ ...prev, cta_primary_link: e.target.value }))}
+                          />
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <AdminInput
+                            label="Secondary Button Text"
+                            value={homeContent.cta_secondary_text}
+                            onChange={(e) => setHomeContent((prev) => ({ ...prev, cta_secondary_text: e.target.value }))}
+                          />
+                          <AdminInput
+                            label="Secondary Button Link"
+                            value={homeContent.cta_secondary_link}
+                            onChange={(e) => setHomeContent((prev) => ({ ...prev, cta_secondary_link: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </AdminModal>
+
+                <ConfirmationModal
+                  isOpen={homeContentConfirmSave}
+                  onClose={() => setHomeContentConfirmSave(false)}
+                  onConfirm={() => {
+                    saveHomeContent();
+                    setHomeContentConfirmSave(false);
+                    setHomeContentEditMode(false);
+                  }}
+                  title="Confirm Save"
+                  message="Are you sure you want to save these changes to home content?"
+                  confirmText="Save Changes"
+                  variant="info"
+                  isLoading={isWorking}
+                />
+              </>
             )}
-          </div>
+
+            {/* ============================================ */}
+            {/* NAVIGATION ITEMS SECTION */}
+            {/* ============================================ */}
+            {activeSection === 'navigation' && (
+              <>
+                <AdminCard
+                  title="Navigation Items"
+                  subtitle={`${navigationItems.length} items configured`}
+                  actions={
+                    <AdminButton variant="primary" onClick={openNavCreate} icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    }>
+                      Add Item
+                    </AdminButton>
+                  }
+                  noPadding
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#f9fafb' }}>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Label</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Link</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Order</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {navigationItems.map((item, index) => (
+                          <tr
+                            key={item.id}
+                            className="cursor-pointer"
+                            style={{ borderTop: index > 0 ? `1px solid ${isDark ? '#374151' : '#e5e7eb'}` : 'none' }}
+                            onClick={() => openNavView(item)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(55, 65, 81, 0.3)' : '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td className="px-6 py-4">
+                              <span className="text-sm font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{item.label}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.href}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.sort_order}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span 
+                                className="px-2 py-1 text-xs font-medium rounded-full"
+                                style={{
+                                  backgroundColor: item.is_active ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5') : (isDark ? 'rgba(107, 114, 128, 0.2)' : '#f3f4f6'),
+                                  color: item.is_active ? (isDark ? '#34d399' : '#059669') : (isDark ? '#9ca3af' : '#6b7280')
+                                }}
+                              >
+                                {item.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {navigationItems.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-8 text-center">
+                              <p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No navigation items yet. Click "Add Item" to create one.</p>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </AdminCard>
+
+                {/* Navigation View/Edit Modal */}
+                <AdminModal
+                  isOpen={navModalOpen}
+                  onClose={closeNavModal}
+                  title={navEditMode ? (navSelectedItem ? 'Edit Navigation Item' : 'Add Navigation Item') : 'Navigation Item Details'}
+                  size="md"
+                  footer={
+                    <div className="flex justify-between">
+                      <div>
+                        {navSelectedItem && !navEditMode && (
+                          <AdminButton variant="danger" onClick={() => setNavConfirmDelete(true)}>Delete</AdminButton>
+                        )}
+                      </div>
+                      <div className="flex gap-3">
+                        {navEditMode ? (
+                          <>
+                            <AdminButton variant="secondary" onClick={closeNavModal} disabled={isWorking}>Cancel</AdminButton>
+                            <AdminButton variant="primary" onClick={() => setNavConfirmSave(true)} loading={isWorking}>Save</AdminButton>
+                          </>
+                        ) : (
+                          <>
+                            <AdminButton variant="warning" onClick={() => setNavEditMode(true)}>Edit</AdminButton>
+                            <AdminButton variant="secondary" onClick={closeNavModal}>Close</AdminButton>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  }
+                >
+                  {navEditMode ? (
+                    <div className="space-y-4">
+                      <AdminInput label="Label" value={navDraft.label} onChange={(e) => setNavDraft((prev) => ({ ...prev, label: e.target.value }))} placeholder="e.g., About Us" />
+                      <AdminInput label="Link (href)" value={navDraft.href} onChange={(e) => setNavDraft((prev) => ({ ...prev, href: e.target.value }))} placeholder="e.g., /about" />
+                      <AdminInput label="Sort Order" type="number" value={navDraft.sort_order} onChange={(e) => setNavDraft((prev) => ({ ...prev, sort_order: e.target.value }))} />
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          id="nav-active"
+                          checked={navDraft.is_active}
+                          onChange={(e) => setNavDraft((prev) => ({ ...prev, is_active: e.target.checked ? 1 : 0 }))}
+                          className="w-4 h-4 rounded"
+                        />
+                        <label htmlFor="nav-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Active</label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Label</p><p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{navSelectedItem?.label}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Link</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{navSelectedItem?.href}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Sort Order</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{navSelectedItem?.sort_order}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</p><p className="text-sm" style={{ color: navSelectedItem?.is_active ? '#10b981' : '#6b7280' }}>{navSelectedItem?.is_active ? 'Active' : 'Inactive'}</p></div>
+                    </div>
+                  )}
+                </AdminModal>
+
+                <ConfirmationModal isOpen={navConfirmSave} onClose={() => setNavConfirmSave(false)} onConfirm={saveNavigationItem} title="Confirm Save" message="Save this navigation item?" confirmText="Save" variant="info" isLoading={isWorking} />
+                <ConfirmationModal isOpen={navConfirmDelete} onClose={() => setNavConfirmDelete(false)} onConfirm={deleteNavigationItemHandler} title="Confirm Delete" message="Are you sure you want to delete this navigation item? This cannot be undone." confirmText="Delete" variant="danger" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* ============================================ */}
+            {/* SOCIAL LINKS SECTION */}
+            {/* ============================================ */}
+            {activeSection === 'social' && (
+              <>
+                <AdminCard
+                  title="Social Links"
+                  subtitle={`${socialLinks.length} links configured`}
+                  actions={
+                    <AdminButton variant="primary" onClick={openSocialCreate} icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    }>
+                      Add Link
+                    </AdminButton>
+                  }
+                  noPadding
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#f9fafb' }}>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Platform</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Icon</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>URL</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {socialLinks.map((item, index) => (
+                          <tr
+                            key={item.id}
+                            className="cursor-pointer"
+                            style={{ borderTop: index > 0 ? `1px solid ${isDark ? '#374151' : '#e5e7eb'}` : 'none' }}
+                            onClick={() => openSocialView(item)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(55, 65, 81, 0.3)' : '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td className="px-6 py-4"><span className="text-sm font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{item.platform}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.icon}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm truncate max-w-xs block" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.url}</span></td>
+                            <td className="px-6 py-4">
+                              <span className="px-2 py-1 text-xs font-medium rounded-full" style={{ backgroundColor: item.is_active ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5') : (isDark ? 'rgba(107, 114, 128, 0.2)' : '#f3f4f6'), color: item.is_active ? (isDark ? '#34d399' : '#059669') : (isDark ? '#9ca3af' : '#6b7280') }}>
+                                {item.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {socialLinks.length === 0 && (
+                          <tr><td colSpan={4} className="px-6 py-8 text-center"><p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No social links yet.</p></td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </AdminCard>
+
+                <AdminModal isOpen={socialModalOpen} onClose={closeSocialModal} title={socialEditMode ? (socialSelectedItem ? 'Edit Social Link' : 'Add Social Link') : 'Social Link Details'} size="md"
+                  footer={
+                    <div className="flex justify-between">
+                      <div>{socialSelectedItem && !socialEditMode && <AdminButton variant="danger" onClick={() => setSocialConfirmDelete(true)}>Delete</AdminButton>}</div>
+                      <div className="flex gap-3">
+                        {socialEditMode ? (
+                          <><AdminButton variant="secondary" onClick={closeSocialModal} disabled={isWorking}>Cancel</AdminButton><AdminButton variant="primary" onClick={() => setSocialConfirmSave(true)} loading={isWorking}>Save</AdminButton></>
+                        ) : (
+                          <><AdminButton variant="warning" onClick={() => setSocialEditMode(true)}>Edit</AdminButton><AdminButton variant="secondary" onClick={closeSocialModal}>Close</AdminButton></>
+                        )}
+                      </div>
+                    </div>
+                  }
+                >
+                  {socialEditMode ? (
+                    <div className="space-y-4">
+                      <AdminInput label="Platform" value={socialDraft.platform} onChange={(e) => setSocialDraft((prev) => ({ ...prev, platform: e.target.value }))} placeholder="e.g., LinkedIn" />
+                      <AdminInput label="Icon" value={socialDraft.icon} onChange={(e) => setSocialDraft((prev) => ({ ...prev, icon: e.target.value }))} placeholder="e.g., Linkedin" />
+                      <AdminInput label="URL" value={socialDraft.url} onChange={(e) => setSocialDraft((prev) => ({ ...prev, url: e.target.value }))} placeholder="https://..." />
+                      <AdminInput label="Sort Order" type="number" value={socialDraft.sort_order} onChange={(e) => setSocialDraft((prev) => ({ ...prev, sort_order: e.target.value }))} />
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" id="social-active" checked={socialDraft.is_active} onChange={(e) => setSocialDraft((prev) => ({ ...prev, is_active: e.target.checked ? 1 : 0 }))} className="w-4 h-4 rounded" />
+                        <label htmlFor="social-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Active</label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Platform</p><p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{socialSelectedItem?.platform}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Icon</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{socialSelectedItem?.icon}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>URL</p><p className="text-sm break-all" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{socialSelectedItem?.url}</p></div>
+                    </div>
+                  )}
+                </AdminModal>
+
+                <ConfirmationModal isOpen={socialConfirmSave} onClose={() => setSocialConfirmSave(false)} onConfirm={saveSocialLinkItem} title="Confirm Save" message="Save this social link?" confirmText="Save" variant="info" isLoading={isWorking} />
+                <ConfirmationModal isOpen={socialConfirmDelete} onClose={() => setSocialConfirmDelete(false)} onConfirm={deleteSocialLinkItem} title="Confirm Delete" message="Delete this social link?" confirmText="Delete" variant="danger" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* ============================================ */}
+            {/* FOOTER LINKS SECTION */}
+            {/* ============================================ */}
+            {activeSection === 'footer' && (
+              <>
+                <AdminCard
+                  title="Footer Links"
+                  subtitle={`${footerLinks.length} links configured`}
+                  actions={
+                    <AdminButton variant="primary" onClick={openFooterCreate} icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    }>
+                      Add Link
+                    </AdminButton>
+                  }
+                  noPadding
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#f9fafb' }}>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Section</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Label</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Link</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {footerLinks.map((item, index) => (
+                          <tr
+                            key={item.id}
+                            className="cursor-pointer"
+                            style={{ borderTop: index > 0 ? `1px solid ${isDark ? '#374151' : '#e5e7eb'}` : 'none' }}
+                            onClick={() => openFooterView(item)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(55, 65, 81, 0.3)' : '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td className="px-6 py-4"><span className="px-2 py-1 text-xs font-medium rounded" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : '#dbeafe', color: isDark ? '#60a5fa' : '#2563eb' }}>{item.section}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{item.label}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.href}</span></td>
+                            <td className="px-6 py-4">
+                              <span className="px-2 py-1 text-xs font-medium rounded-full" style={{ backgroundColor: item.is_active ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5') : (isDark ? 'rgba(107, 114, 128, 0.2)' : '#f3f4f6'), color: item.is_active ? (isDark ? '#34d399' : '#059669') : (isDark ? '#9ca3af' : '#6b7280') }}>
+                                {item.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {footerLinks.length === 0 && (
+                          <tr><td colSpan={4} className="px-6 py-8 text-center"><p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No footer links yet.</p></td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </AdminCard>
+
+                <AdminModal isOpen={footerModalOpen} onClose={closeFooterModal} title={footerEditMode ? (footerSelectedItem ? 'Edit Footer Link' : 'Add Footer Link') : 'Footer Link Details'} size="md"
+                  footer={
+                    <div className="flex justify-between">
+                      <div>{footerSelectedItem && !footerEditMode && <AdminButton variant="danger" onClick={() => setFooterConfirmDelete(true)}>Delete</AdminButton>}</div>
+                      <div className="flex gap-3">
+                        {footerEditMode ? (
+                          <><AdminButton variant="secondary" onClick={closeFooterModal} disabled={isWorking}>Cancel</AdminButton><AdminButton variant="primary" onClick={() => setFooterConfirmSave(true)} loading={isWorking}>Save</AdminButton></>
+                        ) : (
+                          <><AdminButton variant="warning" onClick={() => setFooterEditMode(true)}>Edit</AdminButton><AdminButton variant="secondary" onClick={closeFooterModal}>Close</AdminButton></>
+                        )}
+                      </div>
+                    </div>
+                  }
+                >
+                  {footerEditMode ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1.5" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Section</label>
+                        <select
+                          value={footerDraft.section}
+                          onChange={(e) => setFooterDraft((prev) => ({ ...prev, section: e.target.value }))}
+                          className="w-full px-4 py-2.5 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          style={{ backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#d1d5db'}`, color: isDark ? '#ffffff' : '#111827' }}
+                        >
+                          <option value="quick">Quick Links</option>
+                          <option value="important">Important Links</option>
+                        </select>
+                      </div>
+                      <AdminInput label="Label" value={footerDraft.label} onChange={(e) => setFooterDraft((prev) => ({ ...prev, label: e.target.value }))} placeholder="Link text" />
+                      <AdminInput label="Link (href)" value={footerDraft.href} onChange={(e) => setFooterDraft((prev) => ({ ...prev, href: e.target.value }))} placeholder="/page or https://..." />
+                      <AdminInput label="Sort Order" type="number" value={footerDraft.sort_order} onChange={(e) => setFooterDraft((prev) => ({ ...prev, sort_order: e.target.value }))} />
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" id="footer-active" checked={footerDraft.is_active} onChange={(e) => setFooterDraft((prev) => ({ ...prev, is_active: e.target.checked ? 1 : 0 }))} className="w-4 h-4 rounded" />
+                        <label htmlFor="footer-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Active</label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Section</p><p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{footerSelectedItem?.section}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Label</p><p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{footerSelectedItem?.label}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Link</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{footerSelectedItem?.href}</p></div>
+                    </div>
+                  )}
+                </AdminModal>
+
+                <ConfirmationModal isOpen={footerConfirmSave} onClose={() => setFooterConfirmSave(false)} onConfirm={saveFooterLinkItem} title="Confirm Save" message="Save this footer link?" confirmText="Save" variant="info" isLoading={isWorking} />
+                <ConfirmationModal isOpen={footerConfirmDelete} onClose={() => setFooterConfirmDelete(false)} onConfirm={deleteFooterLinkItem} title="Confirm Delete" message="Delete this footer link?" confirmText="Delete" variant="danger" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* ============================================ */}
+            {/* HERO SLIDES SECTION */}
+            {/* ============================================ */}
+            {activeSection === 'slides' && (
+              <>
+                <AdminCard
+                  title="Hero Slides"
+                  subtitle={`${slides.length} slides configured`}
+                  actions={
+                    <AdminButton variant="primary" onClick={openSlideCreate} icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    }>
+                      Add Slide
+                    </AdminButton>
+                  }
+                  noPadding
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#f9fafb' }}>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Image</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Title</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>CTA</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Order</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {slides.map((item, index) => (
+                          <tr
+                            key={item.id}
+                            className="cursor-pointer"
+                            style={{ borderTop: index > 0 ? `1px solid ${isDark ? '#374151' : '#e5e7eb'}` : 'none' }}
+                            onClick={() => openSlideView(item)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(55, 65, 81, 0.3)' : '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td className="px-6 py-4">
+                              {item.image_url ? (
+                                <img src={resolveMediaUrl(item.image_url)} alt="" className="h-12 w-20 object-cover rounded" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />
+                              ) : (
+                                <div className="h-12 w-20 rounded flex items-center justify-center" style={{ backgroundColor: isDark ? '#374151' : '#f3f4f6' }}>
+                                  <span className="text-xs" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No image</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4"><span className="text-sm font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{item.title || '-'}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.cta_text || '-'}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.sort_order}</span></td>
+                            <td className="px-6 py-4">
+                              <span className="px-2 py-1 text-xs font-medium rounded-full" style={{ backgroundColor: item.is_active ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5') : (isDark ? 'rgba(107, 114, 128, 0.2)' : '#f3f4f6'), color: item.is_active ? (isDark ? '#34d399' : '#059669') : (isDark ? '#9ca3af' : '#6b7280') }}>
+                                {item.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {slides.length === 0 && (
+                          <tr><td colSpan={5} className="px-6 py-8 text-center"><p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No hero slides yet.</p></td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </AdminCard>
+
+                <AdminModal isOpen={slideModalOpen} onClose={closeSlideModal} title={slideEditMode ? (slideSelectedItem ? 'Edit Hero Slide' : 'Add Hero Slide') : 'Hero Slide Details'} size="lg"
+                  footer={
+                    <div className="flex justify-between">
+                      <div>{slideSelectedItem && !slideEditMode && <AdminButton variant="danger" onClick={() => setSlideConfirmDelete(true)}>Delete</AdminButton>}</div>
+                      <div className="flex gap-3">
+                        {slideEditMode ? (
+                          <><AdminButton variant="secondary" onClick={closeSlideModal} disabled={isWorking}>Cancel</AdminButton><AdminButton variant="primary" onClick={() => setSlideConfirmSave(true)} loading={isWorking}>Save</AdminButton></>
+                        ) : (
+                          <><AdminButton variant="warning" onClick={() => setSlideEditMode(true)}>Edit</AdminButton><AdminButton variant="secondary" onClick={closeSlideModal}>Close</AdminButton></>
+                        )}
+                      </div>
+                    </div>
+                  }
+                >
+                  {slideEditMode ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <AdminInput label="Image URL" value={slideDraft.image_url} onChange={(e) => setSlideDraft((prev) => ({ ...prev, image_url: e.target.value }))} placeholder="Image URL" />
+                        <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files?.[0], 'slides', (url) => setSlideDraft((prev) => ({ ...prev, image_url: url })))} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer" style={{ color: isDark ? '#9ca3af' : '#4b5563' }} />
+                        {slideDraft.image_url && <img src={resolveMediaUrl(slideDraft.image_url)} alt="" className="h-24 w-auto rounded mt-2" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />}
+                      </div>
+                      <AdminInput label="Title" value={slideDraft.title} onChange={(e) => setSlideDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="Slide title" />
+                      <AdminInput label="Subtitle" value={slideDraft.subtitle} onChange={(e) => setSlideDraft((prev) => ({ ...prev, subtitle: e.target.value }))} placeholder="Slide subtitle" />
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="CTA Text" value={slideDraft.cta_text} onChange={(e) => setSlideDraft((prev) => ({ ...prev, cta_text: e.target.value }))} placeholder="Button text" />
+                        <AdminInput label="CTA Link" value={slideDraft.cta_link} onChange={(e) => setSlideDraft((prev) => ({ ...prev, cta_link: e.target.value }))} placeholder="/page" />
+                      </div>
+                      <AdminInput label="Sort Order" type="number" value={slideDraft.sort_order} onChange={(e) => setSlideDraft((prev) => ({ ...prev, sort_order: e.target.value }))} />
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" id="slide-active" checked={slideDraft.is_active} onChange={(e) => setSlideDraft((prev) => ({ ...prev, is_active: e.target.checked ? 1 : 0 }))} className="w-4 h-4 rounded" />
+                        <label htmlFor="slide-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Active</label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {slideSelectedItem?.image_url && <img src={resolveMediaUrl(slideSelectedItem.image_url)} alt="" className="w-full h-48 object-cover rounded-lg" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />}
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Title</p><p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{slideSelectedItem?.title || '-'}</p></div>
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Subtitle</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{slideSelectedItem?.subtitle || '-'}</p></div>
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>CTA Text</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{slideSelectedItem?.cta_text || '-'}</p></div>
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>CTA Link</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{slideSelectedItem?.cta_link || '-'}</p></div>
+                      </div>
+                    </div>
+                  )}
+                </AdminModal>
+
+                <ConfirmationModal isOpen={slideConfirmSave} onClose={() => setSlideConfirmSave(false)} onConfirm={saveSlideItem} title="Confirm Save" message="Save this hero slide?" confirmText="Save" variant="info" isLoading={isWorking} />
+                <ConfirmationModal isOpen={slideConfirmDelete} onClose={() => setSlideConfirmDelete(false)} onConfirm={deleteSlideItem} title="Confirm Delete" message="Delete this hero slide?" confirmText="Delete" variant="danger" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* ============================================ */}
+            {/* HOME STATS SECTION */}
+            {/* ============================================ */}
+            {activeSection === 'stats' && (
+              <>
+                <AdminCard
+                  title="Home Stats"
+                  subtitle={`${stats.length} stats configured`}
+                  actions={
+                    <AdminButton variant="primary" onClick={openStatCreate} icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    }>
+                      Add Stat
+                    </AdminButton>
+                  }
+                  noPadding
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#f9fafb' }}>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Label</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Value</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Icon</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Order</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stats.map((item, index) => (
+                          <tr
+                            key={item.id}
+                            className="cursor-pointer"
+                            style={{ borderTop: index > 0 ? `1px solid ${isDark ? '#374151' : '#e5e7eb'}` : 'none' }}
+                            onClick={() => openStatView(item)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(55, 65, 81, 0.3)' : '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td className="px-6 py-4"><span className="text-sm font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{item.label}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm font-bold" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{item.value}{item.suffix}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.icon_name}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.sort_order}</span></td>
+                            <td className="px-6 py-4">
+                              <span className="px-2 py-1 text-xs font-medium rounded-full" style={{ backgroundColor: item.is_active ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5') : (isDark ? 'rgba(107, 114, 128, 0.2)' : '#f3f4f6'), color: item.is_active ? (isDark ? '#34d399' : '#059669') : (isDark ? '#9ca3af' : '#6b7280') }}>
+                                {item.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {stats.length === 0 && (
+                          <tr><td colSpan={5} className="px-6 py-8 text-center"><p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No stats yet.</p></td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </AdminCard>
+
+                <AdminModal isOpen={statModalOpen} onClose={closeStatModal} title={statEditMode ? (statSelectedItem ? 'Edit Stat' : 'Add Stat') : 'Stat Details'} size="md"
+                  footer={
+                    <div className="flex justify-between">
+                      <div>{statSelectedItem && !statEditMode && <AdminButton variant="danger" onClick={() => setStatConfirmDelete(true)}>Delete</AdminButton>}</div>
+                      <div className="flex gap-3">
+                        {statEditMode ? (
+                          <><AdminButton variant="secondary" onClick={closeStatModal} disabled={isWorking}>Cancel</AdminButton><AdminButton variant="primary" onClick={() => setStatConfirmSave(true)} loading={isWorking}>Save</AdminButton></>
+                        ) : (
+                          <><AdminButton variant="warning" onClick={() => setStatEditMode(true)}>Edit</AdminButton><AdminButton variant="secondary" onClick={closeStatModal}>Close</AdminButton></>
+                        )}
+                      </div>
+                    </div>
+                  }
+                >
+                  {statEditMode ? (
+                    <div className="space-y-4">
+                      <AdminInput label="Label" value={statDraft.label} onChange={(e) => setStatDraft((prev) => ({ ...prev, label: e.target.value }))} placeholder="e.g., Students" />
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Value" type="number" value={statDraft.value} onChange={(e) => setStatDraft((prev) => ({ ...prev, value: e.target.value }))} placeholder="e.g., 500" />
+                        <AdminInput label="Suffix" value={statDraft.suffix} onChange={(e) => setStatDraft((prev) => ({ ...prev, suffix: e.target.value }))} placeholder="e.g., +" />
+                      </div>
+                      <AdminInput label="Icon Name" value={statDraft.icon_name} onChange={(e) => setStatDraft((prev) => ({ ...prev, icon_name: e.target.value }))} placeholder="e.g., Users" />
+                      <AdminInput label="Sort Order" type="number" value={statDraft.sort_order} onChange={(e) => setStatDraft((prev) => ({ ...prev, sort_order: e.target.value }))} />
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" id="stat-active" checked={statDraft.is_active} onChange={(e) => setStatDraft((prev) => ({ ...prev, is_active: e.target.checked ? 1 : 0 }))} className="w-4 h-4 rounded" />
+                        <label htmlFor="stat-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Active</label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Label</p><p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{statSelectedItem?.label}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Value</p><p className="text-lg font-bold" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{statSelectedItem?.value}{statSelectedItem?.suffix}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Icon</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{statSelectedItem?.icon_name}</p></div>
+                    </div>
+                  )}
+                </AdminModal>
+
+                <ConfirmationModal isOpen={statConfirmSave} onClose={() => setStatConfirmSave(false)} onConfirm={saveStatItem} title="Confirm Save" message="Save this stat?" confirmText="Save" variant="info" isLoading={isWorking} />
+                <ConfirmationModal isOpen={statConfirmDelete} onClose={() => setStatConfirmDelete(false)} onConfirm={deleteStatItem} title="Confirm Delete" message="Delete this stat?" confirmText="Delete" variant="danger" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* ============================================ */}
+            {/* NEWS ITEMS SECTION */}
+            {/* ============================================ */}
+            {activeSection === 'news' && (
+              <>
+                <AdminCard
+                  title="News Items"
+                  subtitle={`${newsItems.length} news items`}
+                  actions={
+                    <AdminButton variant="primary" onClick={openNewsCreate} icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    }>
+                      Add News
+                    </AdminButton>
+                  }
+                  noPadding
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr style={{ backgroundColor: isDark ? 'rgba(55, 65, 81, 0.5)' : '#f9fafb' }}>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Image</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Title</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Category</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {newsItems.map((item, index) => (
+                          <tr
+                            key={item.id}
+                            className="cursor-pointer"
+                            style={{ borderTop: index > 0 ? `1px solid ${isDark ? '#374151' : '#e5e7eb'}` : 'none' }}
+                            onClick={() => openNewsView(item)}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? 'rgba(55, 65, 81, 0.3)' : '#f9fafb'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <td className="px-6 py-4">
+                              {item.image_url ? (
+                                <img src={resolveMediaUrl(item.image_url)} alt="" className="h-10 w-16 object-cover rounded" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />
+                              ) : (
+                                <div className="h-10 w-16 rounded flex items-center justify-center" style={{ backgroundColor: isDark ? '#374151' : '#f3f4f6' }}>
+                                  <span className="text-xs" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>-</span>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4"><span className="text-sm font-medium line-clamp-1" style={{ color: isDark ? '#ffffff' : '#111827' }}>{item.title}</span></td>
+                            <td className="px-6 py-4"><span className="px-2 py-1 text-xs font-medium rounded" style={{ backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : '#ede9fe', color: isDark ? '#a78bfa' : '#7c3aed' }}>{item.category}</span></td>
+                            <td className="px-6 py-4"><span className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{item.publish_date ? new Date(item.publish_date).toLocaleDateString() : '-'}</span></td>
+                            <td className="px-6 py-4">
+                              <span className="px-2 py-1 text-xs font-medium rounded-full" style={{ backgroundColor: item.is_active ? (isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5') : (isDark ? 'rgba(107, 114, 128, 0.2)' : '#f3f4f6'), color: item.is_active ? (isDark ? '#34d399' : '#059669') : (isDark ? '#9ca3af' : '#6b7280') }}>
+                                {item.is_active ? 'Active' : 'Inactive'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {newsItems.length === 0 && (
+                          <tr><td colSpan={5} className="px-6 py-8 text-center"><p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>No news items yet.</p></td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </AdminCard>
+
+                <AdminModal isOpen={newsModalOpen} onClose={closeNewsModal} title={newsEditMode ? (newsSelectedItem ? 'Edit News Item' : 'Add News Item') : 'News Item Details'} size="lg"
+                  footer={
+                    <div className="flex justify-between">
+                      <div>{newsSelectedItem && !newsEditMode && <AdminButton variant="danger" onClick={() => setNewsConfirmDelete(true)}>Delete</AdminButton>}</div>
+                      <div className="flex gap-3">
+                        {newsEditMode ? (
+                          <><AdminButton variant="secondary" onClick={closeNewsModal} disabled={isWorking}>Cancel</AdminButton><AdminButton variant="primary" onClick={() => setNewsConfirmSave(true)} loading={isWorking}>Save</AdminButton></>
+                        ) : (
+                          <><AdminButton variant="warning" onClick={() => setNewsEditMode(true)}>Edit</AdminButton><AdminButton variant="secondary" onClick={closeNewsModal}>Close</AdminButton></>
+                        )}
+                      </div>
+                    </div>
+                  }
+                >
+                  {newsEditMode ? (
+                    <div className="space-y-4">
+                      <AdminInput label="Title" value={newsDraft.title} onChange={(e) => setNewsDraft((prev) => ({ ...prev, title: e.target.value }))} placeholder="News title" />
+                      <AdminTextarea label="Excerpt" value={newsDraft.excerpt} onChange={(e) => setNewsDraft((prev) => ({ ...prev, excerpt: e.target.value }))} placeholder="Brief description" rows={3} />
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Category" value={newsDraft.category} onChange={(e) => setNewsDraft((prev) => ({ ...prev, category: e.target.value }))} placeholder="e.g., News, Event" />
+                        <AdminInput label="Publish Date" type="datetime-local" value={newsDraft.publish_date} onChange={(e) => setNewsDraft((prev) => ({ ...prev, publish_date: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <AdminInput label="Image URL" value={newsDraft.image_url} onChange={(e) => setNewsDraft((prev) => ({ ...prev, image_url: e.target.value }))} placeholder="Image URL" />
+                        <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files?.[0], 'news', (url) => setNewsDraft((prev) => ({ ...prev, image_url: url })))} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer" style={{ color: isDark ? '#9ca3af' : '#4b5563' }} />
+                      </div>
+                      <AdminInput label="External Link" value={newsDraft.external_link} onChange={(e) => setNewsDraft((prev) => ({ ...prev, external_link: e.target.value }))} placeholder="https://..." />
+                      <div className="flex items-center gap-3">
+                        <input type="checkbox" id="news-active" checked={newsDraft.is_active} onChange={(e) => setNewsDraft((prev) => ({ ...prev, is_active: e.target.checked ? 1 : 0 }))} className="w-4 h-4 rounded" />
+                        <label htmlFor="news-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Active</label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {newsSelectedItem?.image_url && <img src={resolveMediaUrl(newsSelectedItem.image_url)} alt="" className="w-full h-48 object-cover rounded-lg" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />}
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Title</p><p className="text-sm font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{newsSelectedItem?.title}</p></div>
+                      <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Excerpt</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{newsSelectedItem?.excerpt || '-'}</p></div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Category</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{newsSelectedItem?.category}</p></div>
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Publish Date</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{newsSelectedItem?.publish_date ? new Date(newsSelectedItem.publish_date).toLocaleString() : '-'}</p></div>
+                      </div>
+                      {newsSelectedItem?.external_link && <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>External Link</p><a href={newsSelectedItem.external_link} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{newsSelectedItem.external_link}</a></div>}
+                    </div>
+                  )}
+                </AdminModal>
+
+                <ConfirmationModal isOpen={newsConfirmSave} onClose={() => setNewsConfirmSave(false)} onConfirm={saveNewsItemEntry} title="Confirm Save" message="Save this news item?" confirmText="Save" variant="info" isLoading={isWorking} />
+                <ConfirmationModal isOpen={newsConfirmDelete} onClose={() => setNewsConfirmDelete(false)} onConfirm={deleteNewsItemEntry} title="Confirm Delete" message="Delete this news item?" confirmText="Delete" variant="danger" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* People Directory Section */}
+            {activeSection === 'people' && (
+              <>
+                <AdminCard>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                        People Directory
+                      </h2>
+                      <p className="text-sm mt-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        Manage faculty, staff, and students
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={peopleFilterCategory}
+                        onChange={(e) => setPeopleFilterCategory(e.target.value)}
+                        className="px-3 py-2 rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style={{
+                          backgroundColor: isDark ? '#374151' : '#ffffff',
+                          borderColor: isDark ? '#4b5563' : '#d1d5db',
+                          color: isDark ? '#ffffff' : '#111827'
+                        }}
+                      >
+                        <option value="all">All Categories</option>
+                        {peopleCategoryOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <AdminButton onClick={openPeopleCreate} disabled={isWorking}>
+                        + Add Person
+                      </AdminButton>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                          <th className="text-left py-3 px-4 font-medium" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Photo</th>
+                          <th className="text-left py-3 px-4 font-medium" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Name</th>
+                          <th className="text-left py-3 px-4 font-medium hidden md:table-cell" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Category</th>
+                          <th className="text-left py-3 px-4 font-medium hidden lg:table-cell" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Designation</th>
+                          <th className="text-left py-3 px-4 font-medium hidden xl:table-cell" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Email</th>
+                          <th className="text-center py-3 px-4 font-medium" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredPeopleEntries.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="text-center py-8" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>
+                              No people entries found
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredPeopleEntries.map((person) => (
+                            <tr
+                              key={person.id}
+                              onClick={() => openPeopleView(person)}
+                              className="cursor-pointer"
+                              style={{ 
+                                borderBottom: `1px solid ${isDark ? '#374151' : '#f3f4f6'}`,
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = isDark ? '#374151' : '#f9fafb'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <td className="py-3 px-4">
+                                {person.image_url ? (
+                                  <img src={resolveMediaUrl(person.image_url)} alt="" className="w-10 h-10 rounded-full object-cover" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium" style={{ backgroundColor: isDark ? '#374151' : '#f3f4f6', color: isDark ? '#9ca3af' : '#6b7280' }}>
+                                    {person.name?.charAt(0).toUpperCase() || '?'}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{person.name}</td>
+                              <td className="py-3 px-4 hidden md:table-cell">
+                                <span className="px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151' }}>
+                                  {peopleCategoryOptions.find(c => c.value === person.category)?.label || person.category}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 hidden lg:table-cell" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{person.designation || '-'}</td>
+                              <td className="py-3 px-4 hidden xl:table-cell" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{person.email || '-'}</td>
+                              <td className="py-3 px-4 text-center">
+                                <span className={`inline-block w-2 h-2 rounded-full ${person.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </AdminCard>
+
+                {/* People Modal */}
+                <AdminModal
+                  isOpen={peopleModalOpen}
+                  onClose={closePeopleModal}
+                  title={peopleSelectedItem ? (peopleEditMode ? 'Edit Person' : 'View Person') : 'Add Person'}
+                  size="lg"
+                  footer={
+                    peopleEditMode ? (
+                      <div className="flex justify-end gap-3">
+                        <AdminButton variant="secondary" onClick={closePeopleModal}>Cancel</AdminButton>
+                        <AdminButton onClick={() => setPeopleConfirmSave(true)} disabled={isWorking}>Save</AdminButton>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between">
+                        <AdminButton variant="danger" onClick={() => setPeopleConfirmDelete(true)} disabled={isWorking}>Delete</AdminButton>
+                        <div className="flex gap-3">
+                          <AdminButton variant="secondary" onClick={closePeopleModal}>Close</AdminButton>
+                          <AdminButton onClick={() => setPeopleEditMode(true)}>Edit</AdminButton>
+                        </div>
+                      </div>
+                    )
+                  }
+                >
+                  {peopleEditMode ? (
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Category</label>
+                          <select
+                            value={peopleDraft.category}
+                            onChange={(e) => setPeopleDraft((prev) => ({ ...prev, category: e.target.value }))}
+                            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            style={{
+                              backgroundColor: isDark ? '#374151' : '#ffffff',
+                              borderColor: isDark ? '#4b5563' : '#d1d5db',
+                              color: isDark ? '#ffffff' : '#111827'
+                            }}
+                          >
+                            {peopleCategoryOptions.map(opt => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <AdminInput label="Name" value={peopleDraft.name} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, name: e.target.value }))} placeholder="Full name" />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Designation" value={peopleDraft.designation} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, designation: e.target.value }))} placeholder="e.g., Professor, Lab Assistant" />
+                        <AdminInput label="Specialization" value={peopleDraft.specialization} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, specialization: e.target.value }))} placeholder="Area of expertise" />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Department" value={peopleDraft.department} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, department: e.target.value }))} placeholder="Department name" />
+                        <AdminInput label="Year/Batch Label" value={peopleDraft.year_label} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, year_label: e.target.value }))} placeholder="e.g., 2024 Batch" />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Email" type="email" value={peopleDraft.email} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, email: e.target.value }))} placeholder="email@example.com" />
+                        <AdminInput label="Phone" value={peopleDraft.phone} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, phone: e.target.value }))} placeholder="+91..." />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Room/Office" value={peopleDraft.room} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, room: e.target.value }))} placeholder="e.g., Room 101" />
+                        <AdminInput label="Profile URL" value={peopleDraft.profile_url} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, profile_url: e.target.value }))} placeholder="https://..." />
+                      </div>
+                      <div className="space-y-2">
+                        <AdminInput label="Image URL" value={peopleDraft.image_url} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, image_url: e.target.value }))} placeholder="Image URL" />
+                        <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files?.[0], 'people', (url) => setPeopleDraft((prev) => ({ ...prev, image_url: url })))} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer" style={{ color: isDark ? '#9ca3af' : '#4b5563' }} />
+                      </div>
+                      <AdminInput label="Resource Link" value={peopleDraft.resource_link} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, resource_link: e.target.value }))} placeholder="Link to CV, publications, etc." />
+                      <AdminTextarea label="Research Interests" value={peopleDraft.research_interests_text} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, research_interests_text: e.target.value }))} placeholder="Research interests, one per line" rows={3} />
+                      <AdminTextarea label="Responsibilities" value={peopleDraft.responsibilities_text} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, responsibilities_text: e.target.value }))} placeholder="Key responsibilities, one per line" rows={3} />
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Sort Order" type="number" value={peopleDraft.sort_order} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, sort_order: e.target.value }))} />
+                        <div className="flex items-center gap-3 pt-6">
+                          <input type="checkbox" id="people-active" checked={peopleDraft.is_active} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, is_active: e.target.checked ? 1 : 0 }))} className="w-4 h-4 rounded" />
+                          <label htmlFor="people-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Active</label>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                      <div className="flex items-start gap-4">
+                        {peopleSelectedItem?.image_url ? (
+                          <img src={resolveMediaUrl(peopleSelectedItem.image_url)} alt="" className="w-20 h-20 rounded-xl object-cover" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />
+                        ) : (
+                          <div className="w-20 h-20 rounded-xl flex items-center justify-center text-2xl font-medium" style={{ backgroundColor: isDark ? '#374151' : '#f3f4f6', color: isDark ? '#9ca3af' : '#6b7280' }}>
+                            {peopleSelectedItem?.name?.charAt(0).toUpperCase() || '?'}
+                          </div>
+                        )}
+                        <div>
+                          <h3 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>{peopleSelectedItem?.name}</h3>
+                          <p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{peopleSelectedItem?.designation || 'No designation'}</p>
+                          <span className="inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151' }}>
+                            {peopleCategoryOptions.find(c => c.value === peopleSelectedItem?.category)?.label || peopleSelectedItem?.category}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Specialization</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.specialization || '-'}</p></div>
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Department</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.department || '-'}</p></div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Email</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.email || '-'}</p></div>
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Phone</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.phone || '-'}</p></div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Room/Office</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.room || '-'}</p></div>
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Year/Batch</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.year_label || '-'}</p></div>
+                      </div>
+                      {peopleSelectedItem?.profile_url && (
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Profile URL</p><a href={peopleSelectedItem.profile_url} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{peopleSelectedItem.profile_url}</a></div>
+                      )}
+                      {peopleSelectedItem?.resource_link && (
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Resource Link</p><a href={peopleSelectedItem.resource_link} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{peopleSelectedItem.resource_link}</a></div>
+                      )}
+                      {peopleSelectedItem?.research_interests_text && (
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Research Interests</p><p className="text-sm whitespace-pre-line" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem.research_interests_text}</p></div>
+                      )}
+                      {peopleSelectedItem?.responsibilities_text && (
+                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Responsibilities</p><p className="text-sm whitespace-pre-line" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem.responsibilities_text}</p></div>
+                      )}
+                    </div>
+                  )}
+                </AdminModal>
+
+                <ConfirmationModal isOpen={peopleConfirmSave} onClose={() => setPeopleConfirmSave(false)} onConfirm={savePeopleEntry} title="Confirm Save" message="Save this person entry?" confirmText="Save" variant="info" isLoading={isWorking} />
+                <ConfirmationModal isOpen={peopleConfirmDelete} onClose={() => setPeopleConfirmDelete(false)} onConfirm={deletePeopleEntryItem} title="Confirm Delete" message="Delete this person entry?" confirmText="Delete" variant="danger" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* About Content Section */}
+            {activeSection === 'about-content' && (
+              <>
+                <AdminCard>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                        About Page Content
+                      </h2>
+                      <p className="text-sm mt-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        Hero, story, mission/vision, values, milestones, and stats
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      {aboutEditMode ? (
+                        <>
+                          <AdminButton variant="secondary" onClick={() => setAboutEditMode(false)}>Cancel</AdminButton>
+                          <AdminButton onClick={() => setAboutConfirmSave(true)} disabled={isWorking}>Save Changes</AdminButton>
+                        </>
+                      ) : (
+                        <AdminButton onClick={() => setAboutEditMode(true)}>Edit Content</AdminButton>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                    {/* Hero Section */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Hero Section</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Hero Title" value={aboutContent.hero_title} onChange={(e) => setAboutContent(prev => ({ ...prev, hero_title: e.target.value }))} disabled={!aboutEditMode} />
+                        <AdminInput label="Hero Subtitle" value={aboutContent.hero_subtitle} onChange={(e) => setAboutContent(prev => ({ ...prev, hero_subtitle: e.target.value }))} disabled={!aboutEditMode} />
+                      </div>
+                    </div>
+
+                    {/* Story Section */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Story Section</h3>
+                      <AdminInput label="Story Title" value={aboutContent.story_title} onChange={(e) => setAboutContent(prev => ({ ...prev, story_title: e.target.value }))} disabled={!aboutEditMode} />
+                      <div className="mt-4 space-y-4">
+                        <AdminTextarea label="Story Paragraph 1" value={aboutContent.story_paragraph_1} onChange={(e) => setAboutContent(prev => ({ ...prev, story_paragraph_1: e.target.value }))} disabled={!aboutEditMode} rows={3} />
+                        <AdminTextarea label="Story Paragraph 2" value={aboutContent.story_paragraph_2} onChange={(e) => setAboutContent(prev => ({ ...prev, story_paragraph_2: e.target.value }))} disabled={!aboutEditMode} rows={3} />
+                        <AdminTextarea label="Story Paragraph 3" value={aboutContent.story_paragraph_3} onChange={(e) => setAboutContent(prev => ({ ...prev, story_paragraph_3: e.target.value }))} disabled={!aboutEditMode} rows={3} />
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        <AdminInput label="Story Image URL" value={aboutContent.story_image_url} onChange={(e) => setAboutContent(prev => ({ ...prev, story_image_url: e.target.value }))} disabled={!aboutEditMode} />
+                        {aboutEditMode && <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files?.[0], 'about', (url) => setAboutContent(prev => ({ ...prev, story_image_url: url })))} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer" style={{ color: isDark ? '#9ca3af' : '#4b5563' }} />}
+                      </div>
+                    </div>
+
+                    {/* Mission & Vision */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Mission & Vision</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                          <AdminInput label="Mission Title" value={aboutContent.mission_title} onChange={(e) => setAboutContent(prev => ({ ...prev, mission_title: e.target.value }))} disabled={!aboutEditMode} />
+                          <AdminTextarea label="Mission Description" value={aboutContent.mission_description} onChange={(e) => setAboutContent(prev => ({ ...prev, mission_description: e.target.value }))} disabled={!aboutEditMode} rows={3} />
+                        </div>
+                        <div className="space-y-4">
+                          <AdminInput label="Vision Title" value={aboutContent.vision_title} onChange={(e) => setAboutContent(prev => ({ ...prev, vision_title: e.target.value }))} disabled={!aboutEditMode} />
+                          <AdminTextarea label="Vision Description" value={aboutContent.vision_description} onChange={(e) => setAboutContent(prev => ({ ...prev, vision_description: e.target.value }))} disabled={!aboutEditMode} rows={3} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Core Values */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Core Values</h3>
+                        {aboutEditMode && <AdminButton size="sm" onClick={() => addAboutListItem('values_items', defaultAboutValueItem)}>+ Add Value</AdminButton>}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Values Title" value={aboutContent.values_title} onChange={(e) => setAboutContent(prev => ({ ...prev, values_title: e.target.value }))} disabled={!aboutEditMode} />
+                        <AdminInput label="Values Subtitle" value={aboutContent.values_subtitle} onChange={(e) => setAboutContent(prev => ({ ...prev, values_subtitle: e.target.value }))} disabled={!aboutEditMode} />
+                      </div>
+                      <div className="space-y-3">
+                        {(aboutContent.values_items || []).map((item, idx) => (
+                          <div key={idx} className="p-3 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <div className="flex items-start gap-3">
+                              <div className="flex-1 grid md:grid-cols-3 gap-3">
+                                <select value={item.icon_name} onChange={(e) => updateAboutListItem('values_items', idx, { icon_name: e.target.value })} disabled={!aboutEditMode} className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }}>
+                                  {aboutValueIconOptions.map(icon => <option key={icon} value={icon}>{icon}</option>)}
+                                </select>
+                                <input type="text" value={item.title} onChange={(e) => updateAboutListItem('values_items', idx, { title: e.target.value })} disabled={!aboutEditMode} placeholder="Title" className="px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                                <input type="text" value={item.description} onChange={(e) => updateAboutListItem('values_items', idx, { description: e.target.value })} disabled={!aboutEditMode} placeholder="Description" className="px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              </div>
+                              {aboutEditMode && <button onClick={() => removeAboutListItem('values_items', idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" style={{ backgroundColor: 'transparent' }}><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                            </div>
+                          </div>
+                        ))}
+                        {(aboutContent.values_items || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No values added yet</p>}
+                      </div>
+                    </div>
+
+                    {/* Milestones */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Milestones</h3>
+                        {aboutEditMode && <AdminButton size="sm" onClick={() => addAboutListItem('milestones', defaultAboutMilestoneItem)}>+ Add Milestone</AdminButton>}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Milestones Title" value={aboutContent.milestones_title} onChange={(e) => setAboutContent(prev => ({ ...prev, milestones_title: e.target.value }))} disabled={!aboutEditMode} />
+                        <AdminInput label="Milestones Subtitle" value={aboutContent.milestones_subtitle} onChange={(e) => setAboutContent(prev => ({ ...prev, milestones_subtitle: e.target.value }))} disabled={!aboutEditMode} />
+                      </div>
+                      <div className="space-y-2">
+                        {(aboutContent.milestones || []).map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-2 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <input type="text" value={item.year} onChange={(e) => updateAboutListItem('milestones', idx, { year: e.target.value })} disabled={!aboutEditMode} placeholder="Year" className="w-24 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            <input type="text" value={item.event} onChange={(e) => updateAboutListItem('milestones', idx, { event: e.target.value })} disabled={!aboutEditMode} placeholder="Event description" className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            {aboutEditMode && <button onClick={() => removeAboutListItem('milestones', idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                          </div>
+                        ))}
+                        {(aboutContent.milestones || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No milestones added yet</p>}
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>About Stats</h3>
+                        {aboutEditMode && <AdminButton size="sm" onClick={() => addAboutListItem('stats_items', defaultAboutStatItem)}>+ Add Stat</AdminButton>}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Stats Title" value={aboutContent.stats_title} onChange={(e) => setAboutContent(prev => ({ ...prev, stats_title: e.target.value }))} disabled={!aboutEditMode} />
+                        <AdminInput label="Stats Subtitle" value={aboutContent.stats_subtitle} onChange={(e) => setAboutContent(prev => ({ ...prev, stats_subtitle: e.target.value }))} disabled={!aboutEditMode} />
+                      </div>
+                      <div className="space-y-2">
+                        {(aboutContent.stats_items || []).map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-2 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <input type="text" value={item.label} onChange={(e) => updateAboutListItem('stats_items', idx, { label: e.target.value })} disabled={!aboutEditMode} placeholder="Label" className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            <input type="number" value={item.value} onChange={(e) => updateAboutListItem('stats_items', idx, { value: e.target.value })} disabled={!aboutEditMode} placeholder="Value" className="w-24 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            <input type="text" value={item.suffix} onChange={(e) => updateAboutListItem('stats_items', idx, { suffix: e.target.value })} disabled={!aboutEditMode} placeholder="Suffix" className="w-20 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            {aboutEditMode && <button onClick={() => removeAboutListItem('stats_items', idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                          </div>
+                        ))}
+                        {(aboutContent.stats_items || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No stats added yet</p>}
+                      </div>
+                    </div>
+                  </div>
+                </AdminCard>
+
+                <ConfirmationModal isOpen={aboutConfirmSave} onClose={() => setAboutConfirmSave(false)} onConfirm={saveAboutContent} title="Confirm Save" message="Save about page content?" confirmText="Save" variant="info" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* Academics Content Section */}
+            {activeSection === 'academics-content' && (
+              <>
+                <AdminCard>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                        Academics Page Content
+                      </h2>
+                      <p className="text-sm mt-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        Programs, curriculum, facilities, and admission info
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      {academicsEditMode ? (
+                        <>
+                          <AdminButton variant="secondary" onClick={() => setAcademicsEditMode(false)}>Cancel</AdminButton>
+                          <AdminButton onClick={() => setAcademicsConfirmSave(true)} disabled={isWorking}>Save Changes</AdminButton>
+                        </>
+                      ) : (
+                        <AdminButton onClick={() => setAcademicsEditMode(true)}>Edit Content</AdminButton>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                    {/* Hero Section */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Hero Section</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Hero Title" value={academicsContent.hero_title} onChange={(e) => setAcademicsContent(prev => ({ ...prev, hero_title: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Hero Subtitle" value={academicsContent.hero_subtitle} onChange={(e) => setAcademicsContent(prev => ({ ...prev, hero_subtitle: e.target.value }))} disabled={!academicsEditMode} />
+                      </div>
+                    </div>
+
+                    {/* Programs */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Programs</h3>
+                        {academicsEditMode && <AdminButton size="sm" onClick={addAcademicsProgram}>+ Add Program</AdminButton>}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Programs Title" value={academicsContent.programs_title} onChange={(e) => setAcademicsContent(prev => ({ ...prev, programs_title: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Programs Subtitle" value={academicsContent.programs_subtitle} onChange={(e) => setAcademicsContent(prev => ({ ...prev, programs_subtitle: e.target.value }))} disabled={!academicsEditMode} />
+                      </div>
+                      <div className="space-y-4">
+                        {(academicsContent.programs || []).map((program, idx) => (
+                          <div key={idx} className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <div className="flex items-start justify-between mb-3">
+                              <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#9ca3af' : '#6b7280' }}>Program {idx + 1}</span>
+                              {academicsEditMode && <button onClick={() => removeAcademicsProgram(idx)} className="p-1 text-red-500 hover:bg-red-50 rounded"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>}
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-3">
+                              <input type="text" value={program.title} onChange={(e) => updateAcademicsProgram(idx, { title: e.target.value })} disabled={!academicsEditMode} placeholder="Program Title" className="px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={program.duration} onChange={(e) => updateAcademicsProgram(idx, { duration: e.target.value })} disabled={!academicsEditMode} placeholder="Duration (e.g., 4 years)" className="px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={program.intake} onChange={(e) => updateAcademicsProgram(idx, { intake: e.target.value })} disabled={!academicsEditMode} placeholder="Intake (e.g., 60 seats)" className="px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={program.link_url} onChange={(e) => updateAcademicsProgram(idx, { link_url: e.target.value })} disabled={!academicsEditMode} placeholder="Link URL" className="px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            </div>
+                            <textarea value={program.description} onChange={(e) => updateAcademicsProgram(idx, { description: e.target.value })} disabled={!academicsEditMode} placeholder="Description" rows={2} className="mt-3 px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            <div className="grid md:grid-cols-2 gap-3 mt-3">
+                              <textarea value={formatMultilineList(program.highlights)} onChange={(e) => updateAcademicsProgram(idx, { highlights: parseMultilineList(e.target.value) })} disabled={!academicsEditMode} placeholder="Highlights (one per line)" rows={2} className="px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <textarea value={formatMultilineList(program.courses)} onChange={(e) => updateAcademicsProgram(idx, { courses: parseMultilineList(e.target.value) })} disabled={!academicsEditMode} placeholder="Courses (one per line)" rows={2} className="px-3 py-2 rounded-lg text-sm border w-full" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            </div>
+                          </div>
+                        ))}
+                        {(academicsContent.programs || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No programs added yet</p>}
+                      </div>
+                    </div>
+
+                    {/* Curriculum */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Curriculum Semesters</h3>
+                        {academicsEditMode && <AdminButton size="sm" onClick={addAcademicsSemester}>+ Add Semester</AdminButton>}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Curriculum Title" value={academicsContent.curriculum_title} onChange={(e) => setAcademicsContent(prev => ({ ...prev, curriculum_title: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Curriculum Subtitle" value={academicsContent.curriculum_subtitle} onChange={(e) => setAcademicsContent(prev => ({ ...prev, curriculum_subtitle: e.target.value }))} disabled={!academicsEditMode} />
+                      </div>
+                      <div className="space-y-3">
+                        {(academicsContent.curriculum_semesters || []).map((semester, idx) => (
+                          <div key={idx} className="p-3 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <div className="flex items-start gap-3">
+                              <input type="text" value={semester.semester_label} onChange={(e) => updateAcademicsSemester(idx, { semester_label: e.target.value })} disabled={!academicsEditMode} placeholder="Semester Label" className="w-40 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <textarea value={formatMultilineList(semester.courses)} onChange={(e) => updateAcademicsSemester(idx, { courses: parseMultilineList(e.target.value) })} disabled={!academicsEditMode} placeholder="Courses (one per line)" rows={2} className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              {academicsEditMode && <button onClick={() => removeAcademicsSemester(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                            </div>
+                          </div>
+                        ))}
+                        {(academicsContent.curriculum_semesters || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No semesters added yet</p>}
+                      </div>
+                    </div>
+
+                    {/* Facilities */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Facilities</h3>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Facilities Title" value={academicsContent.facilities_title} onChange={(e) => setAcademicsContent(prev => ({ ...prev, facilities_title: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Facilities Subtitle" value={academicsContent.facilities_subtitle} onChange={(e) => setAcademicsContent(prev => ({ ...prev, facilities_subtitle: e.target.value }))} disabled={!academicsEditMode} />
+                      </div>
+                      <AdminTextarea label="Facilities List (one per line)" value={formatMultilineList(academicsContent.facilities_items)} onChange={(e) => setAcademicsContent(prev => ({ ...prev, facilities_items: parseMultilineList(e.target.value) }))} disabled={!academicsEditMode} rows={4} />
+                    </div>
+
+                    {/* Admission */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Admission Section</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Admission Title" value={academicsContent.admission_title} onChange={(e) => setAcademicsContent(prev => ({ ...prev, admission_title: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Admission Subtitle" value={academicsContent.admission_subtitle} onChange={(e) => setAcademicsContent(prev => ({ ...prev, admission_subtitle: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Primary Button Text" value={academicsContent.admission_primary_text} onChange={(e) => setAcademicsContent(prev => ({ ...prev, admission_primary_text: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Primary Button Link" value={academicsContent.admission_primary_link} onChange={(e) => setAcademicsContent(prev => ({ ...prev, admission_primary_link: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Secondary Button Text" value={academicsContent.admission_secondary_text} onChange={(e) => setAcademicsContent(prev => ({ ...prev, admission_secondary_text: e.target.value }))} disabled={!academicsEditMode} />
+                        <AdminInput label="Secondary Button Link" value={academicsContent.admission_secondary_link} onChange={(e) => setAcademicsContent(prev => ({ ...prev, admission_secondary_link: e.target.value }))} disabled={!academicsEditMode} />
+                      </div>
+                    </div>
+                  </div>
+                </AdminCard>
+
+                <ConfirmationModal isOpen={academicsConfirmSave} onClose={() => setAcademicsConfirmSave(false)} onConfirm={saveAcademicsContent} title="Confirm Save" message="Save academics page content?" confirmText="Save" variant="info" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* Contact Content Section */}
+            {activeSection === 'contact-content' && (
+              <>
+                <AdminCard>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                        Contact Page Content
+                      </h2>
+                      <p className="text-sm mt-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        Contact info, key contacts, quick links, and form settings
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      {contactEditMode ? (
+                        <>
+                          <AdminButton variant="secondary" onClick={() => setContactEditMode(false)}>Cancel</AdminButton>
+                          <AdminButton onClick={() => setContactConfirmSave(true)} disabled={isWorking}>Save Changes</AdminButton>
+                        </>
+                      ) : (
+                        <AdminButton onClick={() => setContactEditMode(true)}>Edit Content</AdminButton>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                    {/* Hero Section */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Hero Section</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Hero Title" value={contactContent.hero_title} onChange={(e) => setContactContent(prev => ({ ...prev, hero_title: e.target.value }))} disabled={!contactEditMode} />
+                        <AdminInput label="Hero Subtitle" value={contactContent.hero_subtitle} onChange={(e) => setContactContent(prev => ({ ...prev, hero_subtitle: e.target.value }))} disabled={!contactEditMode} />
+                      </div>
+                    </div>
+
+                    {/* Info Section */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Contact Info Cards</h3>
+                        {contactEditMode && <AdminButton size="sm" onClick={() => addContactListItem('contact_info_cards', defaultContactInfoCard)}>+ Add Card</AdminButton>}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Info Section Title" value={contactContent.info_section_title} onChange={(e) => setContactContent(prev => ({ ...prev, info_section_title: e.target.value }))} disabled={!contactEditMode} />
+                        <AdminInput label="Info Section Subtitle" value={contactContent.info_section_subtitle} onChange={(e) => setContactContent(prev => ({ ...prev, info_section_subtitle: e.target.value }))} disabled={!contactEditMode} />
+                      </div>
+                      <div className="space-y-3">
+                        {(contactContent.contact_info_cards || []).map((card, idx) => (
+                          <div key={idx} className="p-3 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <div className="flex items-start gap-3">
+                              <select value={card.icon_name} onChange={(e) => updateContactListItem('contact_info_cards', idx, { icon_name: e.target.value })} disabled={!contactEditMode} className="w-32 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }}>
+                                {contactInfoIconOptions.map(icon => <option key={icon} value={icon}>{icon}</option>)}
+                              </select>
+                              <input type="text" value={card.title} onChange={(e) => updateContactListItem('contact_info_cards', idx, { title: e.target.value })} disabled={!contactEditMode} placeholder="Card Title" className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              {contactEditMode && <button onClick={() => removeContactListItem('contact_info_cards', idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                            </div>
+                            <textarea value={(card.details || []).join('\n')} onChange={(e) => updateContactListItem('contact_info_cards', idx, { details: e.target.value.split('\n') })} disabled={!contactEditMode} placeholder="Details (one per line)" rows={2} className="mt-2 w-full px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                          </div>
+                        ))}
+                        {(contactContent.contact_info_cards || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No info cards added yet</p>}
+                      </div>
+                    </div>
+
+                    {/* Form Settings */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Contact Form</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Form Title" value={contactContent.form_title} onChange={(e) => setContactContent(prev => ({ ...prev, form_title: e.target.value }))} disabled={!contactEditMode} />
+                        <AdminInput label="Submit Message" value={contactContent.form_submit_message} onChange={(e) => setContactContent(prev => ({ ...prev, form_submit_message: e.target.value }))} disabled={!contactEditMode} />
+                      </div>
+                      <AdminTextarea label="Form Categories (one per line)" value={(contactContent.form_categories || []).join('\n')} onChange={(e) => setContactContent(prev => ({ ...prev, form_categories: e.target.value.split('\n').filter(Boolean) }))} disabled={!contactEditMode} rows={3} />
+                    </div>
+
+                    {/* Key Contacts */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Key Contacts</h3>
+                        {contactEditMode && <AdminButton size="sm" onClick={() => addContactListItem('key_contacts', defaultKeyContact)}>+ Add Contact</AdminButton>}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Key Contacts Title" value={contactContent.key_contacts_title} onChange={(e) => setContactContent(prev => ({ ...prev, key_contacts_title: e.target.value }))} disabled={!contactEditMode} />
+                        <AdminInput label="Key Contacts Subtitle" value={contactContent.key_contacts_subtitle} onChange={(e) => setContactContent(prev => ({ ...prev, key_contacts_subtitle: e.target.value }))} disabled={!contactEditMode} />
+                      </div>
+                      <div className="space-y-3">
+                        {(contactContent.key_contacts || []).map((contact, idx) => (
+                          <div key={idx} className="p-3 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <div className="flex items-start justify-between mb-2">
+                              <span className="text-xs font-medium" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Contact {idx + 1}</span>
+                              {contactEditMode && <button onClick={() => removeContactListItem('key_contacts', idx)} className="p-1 text-red-500 hover:bg-red-50 rounded"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>}
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-2">
+                              <input type="text" value={contact.name} onChange={(e) => updateContactListItem('key_contacts', idx, { name: e.target.value })} disabled={!contactEditMode} placeholder="Name" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={contact.designation} onChange={(e) => updateContactListItem('key_contacts', idx, { designation: e.target.value })} disabled={!contactEditMode} placeholder="Designation" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="email" value={contact.email} onChange={(e) => updateContactListItem('key_contacts', idx, { email: e.target.value })} disabled={!contactEditMode} placeholder="Email" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={contact.phone} onChange={(e) => updateContactListItem('key_contacts', idx, { phone: e.target.value })} disabled={!contactEditMode} placeholder="Phone" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={contact.office} onChange={(e) => updateContactListItem('key_contacts', idx, { office: e.target.value })} disabled={!contactEditMode} placeholder="Office" className="px-3 py-2 rounded-lg text-sm border md:col-span-2" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            </div>
+                          </div>
+                        ))}
+                        {(contactContent.key_contacts || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No key contacts added yet</p>}
+                      </div>
+                    </div>
+
+                    {/* Quick Links */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Quick Links</h3>
+                        {contactEditMode && <AdminButton size="sm" onClick={() => addContactListItem('quick_links', defaultQuickLinkItem)}>+ Add Link</AdminButton>}
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4 mb-4">
+                        <AdminInput label="Quick Links Title" value={contactContent.quick_links_title} onChange={(e) => setContactContent(prev => ({ ...prev, quick_links_title: e.target.value }))} disabled={!contactEditMode} />
+                        <AdminInput label="Quick Links Subtitle" value={contactContent.quick_links_subtitle} onChange={(e) => setContactContent(prev => ({ ...prev, quick_links_subtitle: e.target.value }))} disabled={!contactEditMode} />
+                      </div>
+                      <div className="space-y-2">
+                        {(contactContent.quick_links || []).map((link, idx) => (
+                          <div key={idx} className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <input type="text" value={link.title} onChange={(e) => updateContactListItem('quick_links', idx, { title: e.target.value })} disabled={!contactEditMode} placeholder="Title" className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            <input type="text" value={link.description} onChange={(e) => updateContactListItem('quick_links', idx, { description: e.target.value })} disabled={!contactEditMode} placeholder="Description" className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            <input type="text" value={link.url} onChange={(e) => updateContactListItem('quick_links', idx, { url: e.target.value })} disabled={!contactEditMode} placeholder="URL" className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            {contactEditMode && <button onClick={() => removeContactListItem('quick_links', idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                          </div>
+                        ))}
+                        {(contactContent.quick_links || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No quick links added yet</p>}
+                      </div>
+                    </div>
+
+                    {/* Map URL */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Map Embed</h3>
+                      <AdminInput label="Map Embed URL" value={contactContent.map_embed_url} onChange={(e) => setContactContent(prev => ({ ...prev, map_embed_url: e.target.value }))} disabled={!contactEditMode} placeholder="Google Maps embed URL" />
+                    </div>
+                  </div>
+                </AdminCard>
+
+                <ConfirmationModal isOpen={contactConfirmSave} onClose={() => setContactConfirmSave(false)} onConfirm={saveContactContentHandler} title="Confirm Save" message="Save contact page content?" confirmText="Save" variant="info" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* Events Content Section */}
+            {activeSection === 'events-content' && (
+              <>
+                <AdminCard>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                        Events Page Content
+                      </h2>
+                      <p className="text-sm mt-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        Hero content, upcoming and past events
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      {eventsEditMode ? (
+                        <>
+                          <AdminButton variant="secondary" onClick={() => setEventsEditMode(false)}>Cancel</AdminButton>
+                          <AdminButton onClick={() => setEventsConfirmSave(true)} disabled={isWorking}>Save Changes</AdminButton>
+                        </>
+                      ) : (
+                        <AdminButton onClick={() => setEventsEditMode(true)}>Edit Content</AdminButton>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                    {/* Hero Section */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Hero Section & Labels</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Hero Title" value={eventsContent.hero_title} onChange={(e) => setEventsContent(prev => ({ ...prev, hero_title: e.target.value }))} disabled={!eventsEditMode} />
+                        <AdminInput label="Hero Subtitle" value={eventsContent.hero_subtitle} onChange={(e) => setEventsContent(prev => ({ ...prev, hero_subtitle: e.target.value }))} disabled={!eventsEditMode} />
+                        <AdminInput label="Search Placeholder" value={eventsContent.search_placeholder} onChange={(e) => setEventsContent(prev => ({ ...prev, search_placeholder: e.target.value }))} disabled={!eventsEditMode} />
+                        <AdminInput label="News Tab Label" value={eventsContent.tab_news_label} onChange={(e) => setEventsContent(prev => ({ ...prev, tab_news_label: e.target.value }))} disabled={!eventsEditMode} />
+                        <AdminInput label="Upcoming Tab Label" value={eventsContent.tab_upcoming_label} onChange={(e) => setEventsContent(prev => ({ ...prev, tab_upcoming_label: e.target.value }))} disabled={!eventsEditMode} />
+                        <AdminInput label="Past Tab Label" value={eventsContent.tab_past_label} onChange={(e) => setEventsContent(prev => ({ ...prev, tab_past_label: e.target.value }))} disabled={!eventsEditMode} />
+                      </div>
+                    </div>
+
+                    {/* Empty State Messages */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Empty State Messages</h3>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <AdminInput label="No News Message" value={eventsContent.no_news_message} onChange={(e) => setEventsContent(prev => ({ ...prev, no_news_message: e.target.value }))} disabled={!eventsEditMode} />
+                        <AdminInput label="No Upcoming Message" value={eventsContent.no_upcoming_message} onChange={(e) => setEventsContent(prev => ({ ...prev, no_upcoming_message: e.target.value }))} disabled={!eventsEditMode} />
+                        <AdminInput label="No Past Message" value={eventsContent.no_past_message} onChange={(e) => setEventsContent(prev => ({ ...prev, no_past_message: e.target.value }))} disabled={!eventsEditMode} />
+                      </div>
+                    </div>
+
+                    {/* Upcoming Events */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Upcoming Events</h3>
+                        {eventsEditMode && <AdminButton size="sm" onClick={() => addEventItem('upcoming_events')}>+ Add Event</AdminButton>}
+                      </div>
+                      <div className="space-y-4">
+                        {(eventsContent.upcoming_events || []).map((event, idx) => (
+                          <div key={idx} className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <div className="flex items-start justify-between mb-3">
+                              <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#9ca3af' : '#6b7280' }}>Event {idx + 1}</span>
+                              {eventsEditMode && <button onClick={() => removeEventItem('upcoming_events', idx)} className="p-1 text-red-500 hover:bg-red-50 rounded"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>}
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-3">
+                              <input type="text" value={event.title} onChange={(e) => updateEventItem('upcoming_events', idx, { title: e.target.value })} disabled={!eventsEditMode} placeholder="Title" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={event.date} onChange={(e) => updateEventItem('upcoming_events', idx, { date: e.target.value })} disabled={!eventsEditMode} placeholder="Date (e.g., 2024-06-15)" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={event.time} onChange={(e) => updateEventItem('upcoming_events', idx, { time: e.target.value })} disabled={!eventsEditMode} placeholder="Time" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={event.venue} onChange={(e) => updateEventItem('upcoming_events', idx, { venue: e.target.value })} disabled={!eventsEditMode} placeholder="Venue" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={event.category} onChange={(e) => updateEventItem('upcoming_events', idx, { category: e.target.value })} disabled={!eventsEditMode} placeholder="Category" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={event.registration_link} onChange={(e) => updateEventItem('upcoming_events', idx, { registration_link: e.target.value })} disabled={!eventsEditMode} placeholder="Registration Link" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            </div>
+                            <textarea value={event.description} onChange={(e) => updateEventItem('upcoming_events', idx, { description: e.target.value })} disabled={!eventsEditMode} placeholder="Description" rows={2} className="mt-3 w-full px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                          </div>
+                        ))}
+                        {(eventsContent.upcoming_events || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No upcoming events</p>}
+                      </div>
+                    </div>
+
+                    {/* Past Events */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Past Events</h3>
+                        {eventsEditMode && <AdminButton size="sm" onClick={() => addEventItem('past_events')}>+ Add Event</AdminButton>}
+                      </div>
+                      <div className="space-y-4">
+                        {(eventsContent.past_events || []).map((event, idx) => (
+                          <div key={idx} className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <div className="flex items-start justify-between mb-3">
+                              <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#9ca3af' : '#6b7280' }}>Past Event {idx + 1}</span>
+                              {eventsEditMode && <button onClick={() => removeEventItem('past_events', idx)} className="p-1 text-red-500 hover:bg-red-50 rounded"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>}
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-3">
+                              <input type="text" value={event.title} onChange={(e) => updateEventItem('past_events', idx, { title: e.target.value })} disabled={!eventsEditMode} placeholder="Title" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={event.date} onChange={(e) => updateEventItem('past_events', idx, { date: e.target.value })} disabled={!eventsEditMode} placeholder="Date" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={event.venue} onChange={(e) => updateEventItem('past_events', idx, { venue: e.target.value })} disabled={!eventsEditMode} placeholder="Venue" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={event.category} onChange={(e) => updateEventItem('past_events', idx, { category: e.target.value })} disabled={!eventsEditMode} placeholder="Category" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            </div>
+                            <textarea value={event.description} onChange={(e) => updateEventItem('past_events', idx, { description: e.target.value })} disabled={!eventsEditMode} placeholder="Description" rows={2} className="mt-3 w-full px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                          </div>
+                        ))}
+                        {(eventsContent.past_events || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No past events</p>}
+                      </div>
+                    </div>
+                  </div>
+                </AdminCard>
+
+                <ConfirmationModal isOpen={eventsConfirmSave} onClose={() => setEventsConfirmSave(false)} onConfirm={saveEventsContentHandler} title="Confirm Save" message="Save events page content?" confirmText="Save" variant="info" isLoading={isWorking} />
+              </>
+            )}
+
+            {/* Specializations Content Section */}
+            {activeSection === 'specializations-content' && (
+              <>
+                <AdminCard>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                        Specializations Page Content
+                      </h2>
+                      <p className="text-sm mt-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        Research areas, specializations, and laboratories
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      {specializationsEditMode ? (
+                        <>
+                          <AdminButton variant="secondary" onClick={() => setSpecializationsEditMode(false)}>Cancel</AdminButton>
+                          <AdminButton onClick={() => setSpecializationsConfirmSave(true)} disabled={isWorking}>Save Changes</AdminButton>
+                        </>
+                      ) : (
+                        <AdminButton onClick={() => setSpecializationsEditMode(true)}>Edit Content</AdminButton>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+                    {/* Hero Section */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <h3 className="text-sm font-semibold mb-4" style={{ color: isDark ? '#ffffff' : '#111827' }}>Hero Section & Labels</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <AdminInput label="Hero Title" value={specializationsContent.hero_title} onChange={(e) => setSpecializationsContent(prev => ({ ...prev, hero_title: e.target.value }))} disabled={!specializationsEditMode} />
+                        <AdminInput label="Hero Subtitle" value={specializationsContent.hero_subtitle} onChange={(e) => setSpecializationsContent(prev => ({ ...prev, hero_subtitle: e.target.value }))} disabled={!specializationsEditMode} />
+                        <AdminInput label="Specializations Tab Label" value={specializationsContent.specializations_tab_label} onChange={(e) => setSpecializationsContent(prev => ({ ...prev, specializations_tab_label: e.target.value }))} disabled={!specializationsEditMode} />
+                        <AdminInput label="Laboratories Tab Label" value={specializationsContent.laboratories_tab_label} onChange={(e) => setSpecializationsContent(prev => ({ ...prev, laboratories_tab_label: e.target.value }))} disabled={!specializationsEditMode} />
+                        <AdminInput label="Specializations Title" value={specializationsContent.specializations_title} onChange={(e) => setSpecializationsContent(prev => ({ ...prev, specializations_title: e.target.value }))} disabled={!specializationsEditMode} />
+                        <AdminInput label="Specializations Subtitle" value={specializationsContent.specializations_subtitle} onChange={(e) => setSpecializationsContent(prev => ({ ...prev, specializations_subtitle: e.target.value }))} disabled={!specializationsEditMode} />
+                      </div>
+                    </div>
+
+                    {/* Specializations List */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Specializations</h3>
+                        {specializationsEditMode && <AdminButton size="sm" onClick={addSpecialization}>+ Add Specialization</AdminButton>}
+                      </div>
+                      <div className="space-y-4">
+                        {(specializationsContent.specializations || []).map((spec, idx) => (
+                          <div key={idx} className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <div className="flex items-start justify-between mb-3">
+                              <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#9ca3af' : '#6b7280' }}>Specialization {idx + 1}</span>
+                              {specializationsEditMode && <button onClick={() => removeSpecialization(idx)} className="p-1 text-red-500 hover:bg-red-50 rounded"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>}
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-3">
+                              <input type="text" value={spec.key} onChange={(e) => updateSpecialization(idx, { key: e.target.value })} disabled={!specializationsEditMode} placeholder="Key (e.g., materials)" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <input type="text" value={spec.title} onChange={(e) => updateSpecialization(idx, { title: e.target.value })} disabled={!specializationsEditMode} placeholder="Title" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                              <select value={spec.color} onChange={(e) => updateSpecialization(idx, { color: e.target.value })} disabled={!specializationsEditMode} className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }}>
+                                {specializationColorOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                              <select value={spec.icon_name} onChange={(e) => updateSpecialization(idx, { icon_name: e.target.value })} disabled={!specializationsEditMode} className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }}>
+                                {specializationIconOptions.map(i => <option key={i} value={i}>{i}</option>)}
+                              </select>
+                            </div>
+                            <textarea value={spec.description} onChange={(e) => updateSpecialization(idx, { description: e.target.value })} disabled={!specializationsEditMode} placeholder="Description" rows={2} className="mt-3 w-full px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            <input type="text" value={spec.image_url} onChange={(e) => updateSpecialization(idx, { image_url: e.target.value })} disabled={!specializationsEditMode} placeholder="Image URL" className="mt-3 w-full px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                          </div>
+                        ))}
+                        {(specializationsContent.specializations || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No specializations added yet</p>}
+                      </div>
+                    </div>
+
+                    {/* Laboratory Rows */}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Laboratory Directory</h3>
+                        {specializationsEditMode && <AdminButton size="sm" onClick={addLabRow}>+ Add Lab</AdminButton>}
+                      </div>
+                      <AdminInput label="Laboratories Title" value={specializationsContent.laboratories_title} onChange={(e) => setSpecializationsContent(prev => ({ ...prev, laboratories_title: e.target.value }))} disabled={!specializationsEditMode} />
+                      <div className="mt-4 space-y-2">
+                        {(specializationsContent.laboratory_rows || []).map((row, idx) => (
+                          <div key={idx} className="flex items-center gap-3 p-2 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
+                            <input type="text" value={row.name} onChange={(e) => updateLabRow(idx, { name: e.target.value })} disabled={!specializationsEditMode} placeholder="Lab Name" className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            <input type="text" value={row.location} onChange={(e) => updateLabRow(idx, { location: e.target.value })} disabled={!specializationsEditMode} placeholder="Location" className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
+                            {specializationsEditMode && <button onClick={() => removeLabRow(idx)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>}
+                          </div>
+                        ))}
+                        {(specializationsContent.laboratory_rows || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No laboratories added yet</p>}
+                      </div>
+                    </div>
+                  </div>
+                </AdminCard>
+
+                <ConfirmationModal isOpen={specializationsConfirmSave} onClose={() => setSpecializationsConfirmSave(false)} onConfirm={saveSpecializationsContentHandler} title="Confirm Save" message="Save specializations page content?" confirmText="Save" variant="info" isLoading={isWorking} />
+              </>
+            )}
+          </main>
         </div>
       </div>
     </div>
+  );
+};
+
+// ============================================
+// MAIN EXPORT WITH THEME PROVIDER
+// ============================================
+
+const AdminDashboard = () => {
+  return (
+    <ThemeProvider>
+      <AdminDashboardContent />
+    </ThemeProvider>
   );
 };
 

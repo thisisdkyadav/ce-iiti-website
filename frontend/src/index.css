@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+/* 
+ * Tailwind CSS v4 - Dark Mode Configuration
+ * Using selector strategy with .dark class
+ * The :where() selector is used for lower specificity
+ */
+@variant dark (&:where(.dark, .dark *));
+
+/* Base dark mode styles */
+.dark {
+  color-scheme: dark;
+}
+
+/* Override for html element when dark mode is active */
+html.dark {
+  background-color: #111827;
+}

@@ -1,16 +1,148 @@
+/* ============================================
+   ADMIN PANEL - MODERN UI STYLES
+   ============================================ */
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-4px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out;
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Line Clamp Utility */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Custom Scrollbar */
+.admin-sidebar::-webkit-scrollbar,
+.admin-modal-card::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-sidebar::-webkit-scrollbar-track,
+.admin-modal-card::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb,
+.admin-modal-card::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.dark .admin-sidebar::-webkit-scrollbar-thumb,
+.dark .admin-modal-card::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.admin-sidebar::-webkit-scrollbar-thumb:hover,
+.admin-modal-card::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.dark .admin-sidebar::-webkit-scrollbar-thumb:hover,
+.dark .admin-modal-card::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* ============================================
+   LEGACY STYLES (for backward compatibility)
+   ============================================ */
+
 .admin-auth-page {
-  background: #f3f4f6;
+  background: linear-gradient(to bottom right, #f8fafc, #e0e7ff);
+}
+
+.dark .admin-auth-page {
+  background: linear-gradient(to bottom right, #111827, #1f2937);
 }
 
 .admin-auth-card {
   width: min(100%, 460px);
-  border-radius: 1rem;
+  border-radius: 1.5rem;
   padding: 2rem;
 }
 
 .admin-auth-form {
   display: grid;
-  gap: 1rem;
+  gap: 1.25rem;
 }
 
 .admin-auth-submit {
@@ -30,21 +162,40 @@
 .admin-auth-form input[type="password"] {
   width: 100%;
   margin-top: 0.4rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.65rem;
-  background: #ffffff;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  transition: all 0.2s;
+}
+
+.dark .admin-auth-form input[type="text"],
+.dark .admin-auth-form input[type="password"] {
+  border-color: #374151;
+  background: rgba(55, 65, 81, 0.5);
+  color: #fff;
 }
 
 .admin-auth-form input[type="text"]:focus,
 .admin-auth-form input[type="password"]:focus {
-  outline: 2px solid #bfdbfe;
-  outline-offset: 1px;
-  border-color: #2563eb;
+  outline: none;
+  ring: 2px solid #3b82f6;
+  border-color: #3b82f6;
+  background: #ffffff;
 }
 
+.dark .admin-auth-form input[type="text"]:focus,
+.dark .admin-auth-form input[type="password"]:focus {
+  background: rgba(55, 65, 81, 0.8);
+}
+
+/* Dashboard Layout */
 .admin-dashboard-page {
-  background: #f3f4f6;
+  background: linear-gradient(to bottom right, #f8fafc, #f1f5f9, #e0e7ff);
+}
+
+.dark .admin-dashboard-page {
+  background: linear-gradient(to bottom right, #111827, #1f2937);
 }
 
 .admin-dashboard-layout {
@@ -52,27 +203,38 @@
 }
 
 .admin-sidebar {
-  max-height: calc(100vh - 7.5rem);
+  max-height: calc(100vh - 7rem);
   overflow-y: auto;
   border-radius: 1rem;
-  padding: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.dark .admin-sidebar {
+  scrollbar-color: #4b5563 transparent;
 }
 
 .admin-sidebar-item {
   display: block;
   width: 100%;
   border: 0;
-  border-radius: 0.65rem;
-  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.875rem;
   margin: 0;
   text-align: left;
   background: transparent;
+  transition: all 0.2s;
 }
 
 .admin-sidebar-item[aria-current="page"] {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: linear-gradient(to right, #3b82f6, #6366f1);
+  color: #ffffff;
   font-weight: 600;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.dark .admin-sidebar-item[aria-current="page"] {
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .admin-content {
@@ -81,11 +243,18 @@
 
 .admin-panel {
   border-radius: 1rem;
-  padding: 1.25rem 1.5rem;
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+.dark .admin-panel {
+  background: #1f2937;
+  border-color: #374151;
 }
 
 .admin-section-header {
-  padding: 1rem 1.25rem;
+  padding: 1.25rem 1.5rem;
 }
 
 .admin-panel .grid {
@@ -95,32 +264,41 @@
 
 .admin-panel label {
   display: block;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .admin-panel label > input,
 .admin-panel label > textarea,
 .admin-panel label > select {
-  margin-top: 0.4rem;
+  margin-top: 0.5rem;
 }
 
 .admin-panel input:not([type="checkbox"]):not([type="file"]),
 .admin-panel textarea,
 .admin-panel select {
   width: 100%;
-  border: 1px solid #d1d5db;
-  border-radius: 0.65rem;
-  padding: 0.65rem 0.8rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.875rem;
   background: #ffffff;
   margin: 0;
+  transition: all 0.2s;
+}
+
+.dark .admin-panel input:not([type="checkbox"]):not([type="file"]),
+.dark .admin-panel textarea,
+.dark .admin-panel select {
+  border-color: #374151;
+  background: rgba(55, 65, 81, 0.5);
+  color: #fff;
 }
 
 .admin-panel input:not([type="checkbox"]):not([type="file"]):focus,
 .admin-panel textarea:focus,
 .admin-panel select:focus {
-  outline: 2px solid #bfdbfe;
-  outline-offset: 1px;
-  border-color: #2563eb;
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .admin-panel textarea {
@@ -129,14 +307,15 @@
 }
 
 .admin-panel input[type="file"] {
-  margin-top: 0.35rem;
-  padding: 0.2rem 0;
+  margin-top: 0.375rem;
+  padding: 0.25rem 0;
 }
 
 .admin-panel input[type="checkbox"] {
-  width: 1rem;
-  height: 1rem;
-  accent-color: #1d4ed8;
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: #3b82f6;
+  border-radius: 0.25rem;
 }
 
 .admin-panel button {
@@ -145,23 +324,39 @@
   justify-content: center;
   min-height: 2.5rem;
   line-height: 1.2;
+  transition: all 0.2s;
 }
 
+/* Entry Cards */
 .admin-entry-card {
-  border-radius: 0.8rem;
+  border-radius: 1rem;
   background: #ffffff;
-  padding: 1rem;
+  padding: 1.25rem;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.dark .admin-entry-card {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.admin-entry-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
 }
 
 .admin-entry-card > * + * {
-  margin-top: 0.9rem;
+  margin-top: 1rem;
 }
 
+/* Table Styles */
 .admin-people-table th,
 .admin-people-table td {
   vertical-align: top;
 }
 
+/* Modal Styles */
 .admin-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -169,20 +364,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   padding: 1rem;
+}
+
+.dark .admin-modal-backdrop {
+  background: rgba(0, 0, 0, 0.7);
 }
 
 .admin-modal-card {
   width: min(100%, 920px);
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
-  border-radius: 1rem;
+  border-radius: 1.5rem;
   border: 1px solid #e5e7eb;
   background: #ffffff;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.25);
-  padding: 1rem 1.25rem 1.25rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  padding: 1.25rem 1.5rem 1.5rem;
 }
+
+.dark .admin-modal-card {
+  border-color: #374151;
+  background: #1f2937;
+}
+
+/* ============================================
+   RESPONSIVE STYLES
+   ============================================ */
 
 @media (max-width: 1024px) {
   .admin-sidebar {
@@ -207,20 +416,118 @@
   }
 }
 
+@media (max-width: 768px) {
+  .admin-auth-card {
+    padding: 1.5rem;
+  }
+
+  .admin-panel {
+    padding: 1.25rem;
+  }
+}
+
 @media (max-width: 640px) {
   .admin-auth-card {
     padding: 1.25rem;
+    border-radius: 1rem;
   }
 
   .admin-panel {
     padding: 1rem;
+    border-radius: 0.875rem;
   }
 
   .admin-entry-card {
-    padding: 0.85rem;
+    padding: 1rem;
+    border-radius: 0.875rem;
   }
 
   .admin-modal-card {
-    padding: 0.9rem;
+    padding: 1rem;
+    border-radius: 1rem;
   }
+
+  .admin-section-header {
+    padding: 1rem;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Focus ring utilities */
+.focus-ring {
+  outline: none;
+}
+
+.focus-ring:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+/* Gradient backgrounds */
+.bg-gradient-primary {
+  background: linear-gradient(to right, #3b82f6, #6366f1);
+}
+
+.bg-gradient-success {
+  background: linear-gradient(to right, #10b981, #059669);
+}
+
+.bg-gradient-danger {
+  background: linear-gradient(to right, #ef4444, #dc2626);
+}
+
+.bg-gradient-warning {
+  background: linear-gradient(to right, #f59e0b, #d97706);
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass {
+  background: rgba(31, 41, 55, 0.8);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+}
+
+/* Smooth transitions */
+.transition-smooth {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Shadow utilities */
+.shadow-glow-blue {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.shadow-glow-indigo {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+/* Button hover effects */
+.btn-hover-lift {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.dark .card-hover:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
