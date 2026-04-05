@@ -54,6 +54,38 @@ function parseStringList(value) {
     .filter(Boolean);
 }
 
+function normalizeYearLabel(value) {
+  return String(value || "").trim();
+}
+
+function getProgramGroupKey(category, yearLabel) {
+  return `${category}::${yearLabel.toLowerCase()}`;
+}
+
+function ensureProgramGroup(groupsMap, entry) {
+  const year = normalizeYearLabel(entry.year_label);
+  if (!year) {
+    return null;
+  }
+
+  const key = getProgramGroupKey(entry.category, year);
+
+  if (!groupsMap.has(key)) {
+    groupsMap.set(key, {
+      id: entry.id,
+      year,
+      link: null,
+      mode: "individual",
+      students: [],
+      sort_order: Number.isFinite(Number(entry.sort_order))
+        ? Number(entry.sort_order)
+        : 0,
+    });
+  }
+
+  return groupsMap.get(key);
+}
+
 router.get("/bootstrap", async (_req, res) => {
   try {
     const [siteSettings] = await query(
@@ -271,8 +303,8 @@ router.get("/people", async (_req, res) => {
     const regularFaculty = [];
     const staff = [];
     const phdStudents = [];
-    const mtechStudents = [];
-    const btechStudents = [];
+    const mtechGroups = new Map();
+    const btechGroups = new Map();
 
     entries.forEach((entry) => {
       if (entry.category === "faculty") {
@@ -323,25 +355,62 @@ router.get("/people", async (_req, res) => {
         return;
       }
 
-      if (entry.category === "mtech") {
-        mtechStudents.push({
-          id: entry.id,
-          year: entry.year_label,
-          link: entry.resource_link,
-          sort_order: entry.sort_order,
-        });
+      if (entry.category === "mtech" || entry.category === "btech") {
+        const targetGroups = entry.category === "mtech" ? mtechGroups : btechGroups;
+        const group = ensureProgramGroup(targetGroups, entry);
+
+        if (!group) {
+          return;
+        }
+
+        const hasName = String(entry.name || "").trim().length > 0;
+
+        if (hasName) {
+          group.students.push({
+            id: entry.id,
+            name: entry.name,
+            email: entry.email,
+            phone: entry.phone,
+            image: normalizeStudentImageUrl(entry.category, entry.name, entry.image_url),
+            sort_order: entry.sort_order,
+          });
+          return;
+        }
+
+        group.id = entry.id;
+        group.link = entry.resource_link || null;
+        group.mode = entry.resource_link ? "resource" : "individual";
+        group.sort_order = Number.isFinite(Number(entry.sort_order))
+          ? Number(entry.sort_order)
+          : group.sort_order;
         return;
       }
-
-      if (entry.category === "btech") {
-        btechStudents.push({
-          id: entry.id,
-          year: entry.year_label,
-          link: entry.resource_link,
-          sort_order: entry.sort_order,
-        });
-      }
     });
+
+    const sortProgramGroups = (groupsMap) =>
+      Array.from(groupsMap.values())
+        .map((group) => ({
+          ...group,
+          students: [...group.students].sort((a, b) => {
+            const sortDiff = (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+            if (sortDiff !== 0) {
+              return sortDiff;
+            }
+
+            return String(a.name || "").localeCompare(String(b.name || ""));
+          }),
+        }))
+        .sort((a, b) => {
+          const sortDiff = (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+          if (sortDiff !== 0) {
+            return sortDiff;
+          }
+
+          return String(a.year || "").localeCompare(String(b.year || ""));
+        });
+
+    const mtechStudents = sortProgramGroups(mtechGroups);
+    const btechStudents = sortProgramGroups(btechGroups);
 
     return res.json({
       regularFaculty,

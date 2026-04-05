@@ -347,13 +347,134 @@ const defaultPeopleEntry = {
   is_active: 1,
 };
 
+const defaultProgramStudentDraft = {
+  name: '',
+  email: '',
+  phone: '',
+  image_url: '',
+  sort_order: 0,
+  is_active: 1,
+};
+
 const peopleCategoryOptions = [
   { value: 'faculty', label: 'Faculty' },
   { value: 'staff', label: 'Staff' },
   { value: 'phd', label: 'Ph.D. Student' },
-  { value: 'mtech', label: 'M.Tech Student List' },
-  { value: 'btech', label: 'B.Tech Student List' },
+  { value: 'mtech', label: 'M.Tech' },
+  { value: 'btech', label: 'B.Tech' },
 ];
+
+const programCategorySet = new Set(['mtech', 'btech']);
+
+function isProgramCategory(category) {
+  return programCategorySet.has(String(category || '').toLowerCase());
+}
+
+function isProgramStudentEntry(entry) {
+  return isProgramCategory(entry?.category) && String(entry?.name || '').trim().length > 0;
+}
+
+function isProgramYearEntry(entry) {
+  return isProgramCategory(entry?.category) && String(entry?.name || '').trim().length === 0;
+}
+
+function normalizeBatchLabel(value) {
+  return String(value || '').trim();
+}
+
+function getProgramEntryMode(entry) {
+  return String(entry?.resource_link || '').trim().length > 0 ? 'resource' : 'individual';
+}
+
+function getPeopleDisplayName(entry) {
+  if (isProgramYearEntry(entry)) {
+    return normalizeBatchLabel(entry.year_label) || 'Untitled Batch';
+  }
+
+  return String(entry?.name || '').trim() || 'Unnamed';
+}
+
+function parseCsvLine(line) {
+  const values = [];
+  let current = '';
+  let insideQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+
+    if (char === '"') {
+      if (insideQuotes && line[index + 1] === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        insideQuotes = !insideQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !insideQuotes) {
+      values.push(current.trim());
+      current = '';
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current.trim());
+  return values;
+}
+
+function parseCsvText(text) {
+  const lines = String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length <= 1) {
+    return [];
+  }
+
+  const headers = parseCsvLine(lines[0]).map((header) =>
+    String(header || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+  );
+
+  return lines.slice(1).map((line) => {
+    const values = parseCsvLine(line);
+    const row = {};
+
+    headers.forEach((header, index) => {
+      if (!header) {
+        return;
+      }
+
+      row[header] = values[index] ?? '';
+    });
+
+    return row;
+  });
+}
+
+function parseBooleanFlag(value, fallback = 1) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (['1', 'true', 'yes', 'y'].includes(normalized)) {
+    return 1;
+  }
+
+  if (['0', 'false', 'no', 'n'].includes(normalized)) {
+    return 0;
+  }
+
+  return fallback;
+}
 
 const adminSectionGroups = [
   {
@@ -738,9 +859,15 @@ const AdminDashboardContent = () => {
   const [peopleEditMode, setPeopleEditMode] = useState(false);
   const [peopleSelectedItem, setPeopleSelectedItem] = useState(null);
   const [peopleDraft, setPeopleDraft] = useState(defaultPeopleEntry);
+  const [peopleProgramMode, setPeopleProgramMode] = useState('resource');
   const [peopleConfirmSave, setPeopleConfirmSave] = useState(false);
   const [peopleConfirmDelete, setPeopleConfirmDelete] = useState(false);
   const [peopleFilterCategory, setPeopleFilterCategory] = useState('all');
+  const [programStudentModalOpen, setProgramStudentModalOpen] = useState(false);
+  const [programStudentSelectedItem, setProgramStudentSelectedItem] = useState(null);
+  const [programStudentDraft, setProgramStudentDraft] = useState(defaultProgramStudentDraft);
+  const [programStudentConfirmDelete, setProgramStudentConfirmDelete] = useState(false);
+  const [programStudentCsvInputKey, setProgramStudentCsvInputKey] = useState(0);
 
   // About Content editing
   const [aboutEditMode, setAboutEditMode] = useState(false);
@@ -1678,25 +1805,80 @@ const AdminDashboardContent = () => {
     const normalized = normalizePeopleEntryForUi(item);
     setPeopleSelectedItem(normalized);
     setPeopleDraft(toPeopleDraft(normalized));
+    setPeopleProgramMode(getProgramEntryMode(normalized));
+    setProgramStudentModalOpen(false);
+    setProgramStudentSelectedItem(null);
+    setProgramStudentDraft(defaultProgramStudentDraft);
     setPeopleEditMode(false);
     setPeopleModalOpen(true);
   };
 
   const openPeopleCreate = () => {
+    const mainEntries = peopleEntries.filter((entry) => !isProgramStudentEntry(entry));
+
     setPeopleSelectedItem(null);
-    setPeopleDraft({ ...defaultPeopleEntry, sort_order: peopleEntries.length });
+    setPeopleDraft({ ...defaultPeopleEntry, sort_order: mainEntries.length });
+    setPeopleProgramMode('resource');
+    setProgramStudentModalOpen(false);
+    setProgramStudentSelectedItem(null);
+    setProgramStudentDraft(defaultProgramStudentDraft);
     setPeopleEditMode(true);
     setPeopleModalOpen(true);
+  };
+
+  const getProgramStudentsForEntry = (entry) => {
+    if (!isProgramYearEntry(entry)) {
+      return [];
+    }
+
+    const category = String(entry.category || '').toLowerCase();
+    const yearLabel = normalizeBatchLabel(entry.year_label).toLowerCase();
+
+    return peopleEntries
+      .filter((item) => {
+        if (!isProgramStudentEntry(item)) {
+          return false;
+        }
+
+        return (
+          String(item.category || '').toLowerCase() === category &&
+          normalizeBatchLabel(item.year_label).toLowerCase() === yearLabel
+        );
+      })
+      .sort((left, right) => {
+        const sortDiff = toInteger(left.sort_order, 0) - toInteger(right.sort_order, 0);
+        if (sortDiff !== 0) {
+          return sortDiff;
+        }
+
+        return String(left.name || '').localeCompare(String(right.name || ''));
+      });
+  };
+
+  const getNextProgramStudentSortOrder = (entry) => {
+    const studentRows = getProgramStudentsForEntry(entry);
+    if (studentRows.length === 0) {
+      return 0;
+    }
+
+    return Math.max(...studentRows.map((student) => toInteger(student.sort_order, 0))) + 1;
   };
 
   const closePeopleModal = () => {
     setPeopleModalOpen(false);
     setPeopleSelectedItem(null);
     setPeopleEditMode(false);
+    setPeopleConfirmSave(false);
+    setPeopleConfirmDelete(false);
+    setProgramStudentModalOpen(false);
+    setProgramStudentSelectedItem(null);
+    setProgramStudentDraft(defaultProgramStudentDraft);
+    setProgramStudentConfirmDelete(false);
+    setProgramStudentCsvInputKey((prev) => prev + 1);
   };
 
   const savePeopleEntry = async () => {
-    const category = peopleDraft.category;
+    const category = String(peopleDraft.category || '').trim();
 
     if (!category) {
       setError('Please select a people category.');
@@ -1723,18 +1905,63 @@ const AdminDashboardContent = () => {
       is_active: peopleDraft.is_active ? 1 : 0,
     };
 
-    const isListType = category === 'mtech' || category === 'btech';
+    const isProgram = isProgramCategory(category);
 
-    if (isListType) {
+    if (isProgram) {
+      const normalizedYear = normalizeBatchLabel(peopleDraft.year_label);
+
+      if (!normalizedYear) {
+        setError('Year/Batch label is required for M.Tech and B.Tech entries.');
+        setSuccessMessage('');
+        return;
+      }
+
+      const duplicateYearEntry = peopleEntries.find((entry) =>
+        isProgramYearEntry(entry) &&
+        String(entry.category || '').toLowerCase() === category.toLowerCase() &&
+        normalizeBatchLabel(entry.year_label).toLowerCase() === normalizedYear.toLowerCase() &&
+        Number(entry.id) !== Number(peopleSelectedItem?.id)
+      );
+
+      if (duplicateYearEntry) {
+        setError('A batch entry for this year already exists in the selected category.');
+        setSuccessMessage('');
+        return;
+      }
+
+      payload.name = null;
+      payload.designation = null;
+      payload.specialization = null;
       payload.image_url = null;
+      payload.department = null;
+      payload.email = null;
+      payload.phone = null;
+      payload.room = null;
+      payload.profile_url = null;
       payload.research_interests = [];
       payload.responsibilities = [];
+      payload.year_label = normalizedYear;
+      payload.resource_link = peopleProgramMode === 'resource'
+        ? toNullableString(peopleDraft.resource_link)
+        : null;
+
+      if (peopleProgramMode === 'resource' && !payload.resource_link) {
+        setError('Resource link is required for "Upload list" mode.');
+        setSuccessMessage('');
+        return;
+      }
+    } else if (!payload.name) {
+      setError('Name is required for this category.');
+      setSuccessMessage('');
+      return;
     }
 
     if (category === 'phd') {
       payload.designation = null;
       payload.specialization = null;
       payload.department = null;
+      payload.year_label = null;
+      payload.resource_link = null;
       payload.room = null;
       payload.profile_url = null;
       payload.research_interests = [];
@@ -1776,10 +2003,22 @@ const AdminDashboardContent = () => {
 
   const deletePeopleEntryItem = async () => {
     if (!peopleSelectedItem?.id) return;
+
+    const selectedProgramStudents = getProgramStudentsForEntry(peopleSelectedItem);
     
     const success = await runAction(
-      () => deletePeopleEntry(peopleSelectedItem.id),
-      'People entry deleted successfully.'
+      async () => {
+        if (isProgramYearEntry(peopleSelectedItem)) {
+          for (const student of selectedProgramStudents) {
+            await deletePeopleEntry(student.id);
+          }
+        }
+
+        await deletePeopleEntry(peopleSelectedItem.id);
+      },
+      isProgramYearEntry(peopleSelectedItem) && selectedProgramStudents.length > 0
+        ? `Batch and ${selectedProgramStudents.length} linked students deleted successfully.`
+        : 'People entry deleted successfully.'
     );
 
     if (success) {
@@ -1788,10 +2027,200 @@ const AdminDashboardContent = () => {
     }
   };
 
+  const openProgramStudentCreate = () => {
+    if (!isProgramYearEntry(peopleSelectedItem)) {
+      return;
+    }
+
+    setProgramStudentSelectedItem(null);
+    setProgramStudentDraft({
+      ...defaultProgramStudentDraft,
+      sort_order: getNextProgramStudentSortOrder(peopleSelectedItem),
+    });
+    setProgramStudentModalOpen(true);
+  };
+
+  const openProgramStudentEdit = (student) => {
+    setProgramStudentSelectedItem(student);
+    setProgramStudentDraft({
+      name: student.name || '',
+      email: student.email || '',
+      phone: student.phone || '',
+      image_url: student.image_url || '',
+      sort_order: toInteger(student.sort_order, 0),
+      is_active: student.is_active ? 1 : 0,
+    });
+    setProgramStudentModalOpen(true);
+  };
+
+  const closeProgramStudentModal = () => {
+    setProgramStudentModalOpen(false);
+    setProgramStudentSelectedItem(null);
+    setProgramStudentDraft(defaultProgramStudentDraft);
+  };
+
+  const saveProgramStudentEntry = async () => {
+    if (!isProgramYearEntry(peopleSelectedItem)) {
+      setError('Select a valid M.Tech/B.Tech batch first.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const payload = {
+      category: peopleSelectedItem.category,
+      year_label: normalizeBatchLabel(peopleSelectedItem.year_label),
+      name: toNullableString(programStudentDraft.name),
+      designation: null,
+      specialization: null,
+      department: null,
+      email: toNullableString(programStudentDraft.email),
+      phone: toNullableString(programStudentDraft.phone),
+      room: null,
+      profile_url: null,
+      image_url: toNullableString(programStudentDraft.image_url),
+      resource_link: null,
+      research_interests: [],
+      responsibilities: [],
+      sort_order: toInteger(programStudentDraft.sort_order, 0),
+      is_active: programStudentDraft.is_active ? 1 : 0,
+    };
+
+    if (!payload.name) {
+      setError('Student name is required.');
+      setSuccessMessage('');
+      return;
+    }
+
+    let success;
+    if (programStudentSelectedItem?.id) {
+      success = await runAction(
+        () => updatePeopleEntry(programStudentSelectedItem.id, payload),
+        'Student entry updated successfully.'
+      );
+    } else {
+      success = await runAction(
+        () => createPeopleEntry(payload),
+        'Student entry created successfully.'
+      );
+    }
+
+    if (success) {
+      closeProgramStudentModal();
+    }
+  };
+
+  const deleteProgramStudentEntry = async () => {
+    if (!programStudentSelectedItem?.id) {
+      return;
+    }
+
+    const success = await runAction(
+      () => deletePeopleEntry(programStudentSelectedItem.id),
+      'Student entry deleted successfully.'
+    );
+
+    if (success) {
+      setProgramStudentConfirmDelete(false);
+      closeProgramStudentModal();
+    }
+  };
+
+  const importProgramStudentsFromCsv = async (file) => {
+    if (!file) {
+      return;
+    }
+
+    if (!isProgramYearEntry(peopleSelectedItem)) {
+      setError('Open an M.Tech/B.Tech batch entry to import students.');
+      setSuccessMessage('');
+      return;
+    }
+
+    try {
+      const csvText = await file.text();
+      const rows = parseCsvText(csvText);
+
+      if (rows.length === 0) {
+        setError('CSV is empty or invalid. Add header row and at least one student row.');
+        setSuccessMessage('');
+        return;
+      }
+
+      const existingStudents = getProgramStudentsForEntry(peopleSelectedItem);
+      let nextSortOrder = existingStudents.length > 0
+        ? Math.max(...existingStudents.map((student) => toInteger(student.sort_order, 0))) + 1
+        : 0;
+
+      const payloads = rows
+        .map((row) => {
+          const name = toNullableString(row.name || row.student_name || row.full_name);
+
+          if (!name) {
+            return null;
+          }
+
+          const explicitSortOrder = toNullableString(row.sort_order);
+          const resolvedSortOrder = explicitSortOrder != null
+            ? toInteger(explicitSortOrder, nextSortOrder)
+            : nextSortOrder;
+
+          nextSortOrder = resolvedSortOrder + 1;
+
+          return {
+            category: peopleSelectedItem.category,
+            year_label: normalizeBatchLabel(peopleSelectedItem.year_label),
+            name,
+            designation: null,
+            specialization: null,
+            department: null,
+            email: toNullableString(row.email),
+            phone: toNullableString(row.phone),
+            room: null,
+            profile_url: null,
+            image_url: null,
+            resource_link: null,
+            research_interests: [],
+            responsibilities: [],
+            sort_order: resolvedSortOrder,
+            is_active: parseBooleanFlag(row.is_active, 1),
+          };
+        })
+        .filter(Boolean);
+
+      if (payloads.length === 0) {
+        setError('No valid student rows found. Ensure CSV has at least a name column.');
+        setSuccessMessage('');
+        return;
+      }
+
+      const success = await runAction(
+        async () => {
+          for (const payload of payloads) {
+            await createPeopleEntry(payload);
+          }
+        },
+        `${payloads.length} students imported successfully.`
+      );
+
+      if (success) {
+        setProgramStudentCsvInputKey((prev) => prev + 1);
+      }
+    } catch (csvError) {
+      setError(csvError.message || 'Failed to import CSV file.');
+      setSuccessMessage('');
+    }
+  };
+
   // Get filtered people entries
+  const mainPeopleEntries = peopleEntries.filter((entry) => !isProgramStudentEntry(entry));
   const filteredPeopleEntries = peopleFilterCategory === 'all' 
-    ? peopleEntries 
-    : peopleEntries.filter(p => p.category === peopleFilterCategory);
+    ? mainPeopleEntries 
+    : mainPeopleEntries.filter(p => p.category === peopleFilterCategory);
+
+  const selectedProgramStudents = getProgramStudentsForEntry(peopleSelectedItem);
+  const selectedPeopleIsProgramBatch = isProgramYearEntry(peopleSelectedItem);
+  const selectedPeopleProgramMode = getProgramEntryMode(peopleSelectedItem);
+  const draftPeopleIsProgram = isProgramCategory(peopleDraft.category);
 
   // ============================================
   // CONTACT CONTENT HANDLERS
@@ -3850,7 +4279,7 @@ const AdminDashboardContent = () => {
                         ))}
                       </select>
                       <AdminButton onClick={openPeopleCreate} disabled={isWorking}>
-                        + Add Person
+                        + Add Entry
                       </AdminButton>
                     </div>
                   </div>
@@ -3875,7 +4304,13 @@ const AdminDashboardContent = () => {
                             </td>
                           </tr>
                         ) : (
-                          filteredPeopleEntries.map((person) => (
+                          filteredPeopleEntries.map((person) => {
+                            const isProgramBatch = isProgramYearEntry(person);
+                            const linkedStudentCount = isProgramBatch
+                              ? getProgramStudentsForEntry(person).length
+                              : 0;
+
+                            return (
                             <tr
                               key={person.id}
                               onClick={() => openPeopleView(person)}
@@ -3887,27 +4322,35 @@ const AdminDashboardContent = () => {
                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                             >
                               <td className="py-3 px-4">
-                                {person.image_url ? (
+                                {person.image_url && !isProgramBatch ? (
                                   <img src={resolveMediaUrl(person.image_url)} alt="" className="w-10 h-10 rounded-full object-cover" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />
                                 ) : (
                                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium" style={{ backgroundColor: isDark ? '#374151' : '#f3f4f6', color: isDark ? '#9ca3af' : '#6b7280' }}>
-                                    {person.name?.charAt(0).toUpperCase() || '?'}
+                                    {isProgramBatch ? 'Y' : (person.name?.charAt(0).toUpperCase() || '?')}
                                   </div>
                                 )}
                               </td>
-                              <td className="py-3 px-4 font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{person.name}</td>
+                              <td className="py-3 px-4 font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                                {getPeopleDisplayName(person)}
+                              </td>
                               <td className="py-3 px-4 hidden md:table-cell">
                                 <span className="px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151' }}>
                                   {peopleCategoryOptions.find(c => c.value === person.category)?.label || person.category}
                                 </span>
                               </td>
-                              <td className="py-3 px-4 hidden lg:table-cell" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{person.designation || '-'}</td>
-                              <td className="py-3 px-4 hidden xl:table-cell" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{person.email || '-'}</td>
+                              <td className="py-3 px-4 hidden lg:table-cell" style={{ color: isDark ? '#d1d5db' : '#374151' }}>
+                                {isProgramBatch
+                                  ? (getProgramEntryMode(person) === 'resource' ? 'Upload list mode' : `${linkedStudentCount} student(s)`)
+                                  : (person.designation || '-')}
+                              </td>
+                              <td className="py-3 px-4 hidden xl:table-cell" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                                {isProgramBatch ? (person.resource_link || '-') : (person.email || '-')}
+                              </td>
                               <td className="py-3 px-4 text-center">
                                 <span className={`inline-block w-2 h-2 rounded-full ${person.is_active ? 'bg-green-500' : 'bg-gray-400'}`} />
                               </td>
                             </tr>
-                          ))
+                          )})
                         )}
                       </tbody>
                     </table>
@@ -3918,7 +4361,27 @@ const AdminDashboardContent = () => {
                 <AdminModal
                   isOpen={peopleModalOpen}
                   onClose={closePeopleModal}
-                  title={peopleSelectedItem ? (peopleEditMode ? 'Edit Person' : 'View Person') : 'Add Person'}
+                  title={peopleSelectedItem ? (
+                    peopleEditMode ? 'Edit Entry' : (
+                      selectedPeopleIsProgramBatch ? (
+                        <div className="flex items-center gap-3">
+                          <span>View Batch Entry</span>
+                          {selectedPeopleProgramMode === 'individual' && (
+                            <label
+                              htmlFor="program-student-csv-input"
+                              className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium cursor-pointer"
+                              style={{
+                                backgroundColor: isDark ? '#4b5563' : '#e5e7eb',
+                                color: isDark ? '#f9fafb' : '#111827',
+                              }}
+                            >
+                              Import CSV
+                            </label>
+                          )}
+                        </div>
+                      ) : 'View Person'
+                    )
+                  ) : 'Add Entry'}
                   size="lg"
                   footer={
                     peopleEditMode ? (
@@ -3939,49 +4402,124 @@ const AdminDashboardContent = () => {
                 >
                   {peopleEditMode ? (
                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <label className="block text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Category</label>
-                          <select
-                            value={peopleDraft.category}
-                            onChange={(e) => setPeopleDraft((prev) => ({ ...prev, category: e.target.value }))}
-                            className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            style={{
-                              backgroundColor: isDark ? '#374151' : '#ffffff',
-                              borderColor: isDark ? '#4b5563' : '#d1d5db',
-                              color: isDark ? '#ffffff' : '#111827'
-                            }}
-                          >
-                            {peopleCategoryOptions.map(opt => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <AdminInput label="Name" value={peopleDraft.name} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, name: e.target.value }))} placeholder="Full name" />
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <AdminInput label="Designation" value={peopleDraft.designation} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, designation: e.target.value }))} placeholder="e.g., Professor, Lab Assistant" />
-                        <AdminInput label="Specialization" value={peopleDraft.specialization} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, specialization: e.target.value }))} placeholder="Area of expertise" />
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <AdminInput label="Department" value={peopleDraft.department} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, department: e.target.value }))} placeholder="Department name" />
-                        <AdminInput label="Year/Batch Label" value={peopleDraft.year_label} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, year_label: e.target.value }))} placeholder="e.g., 2024 Batch" />
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <AdminInput label="Email" type="email" value={peopleDraft.email} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, email: e.target.value }))} placeholder="email@example.com" />
-                        <AdminInput label="Phone" value={peopleDraft.phone} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, phone: e.target.value }))} placeholder="+91..." />
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <AdminInput label="Room/Office" value={peopleDraft.room} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, room: e.target.value }))} placeholder="e.g., Room 101" />
-                        <AdminInput label="Profile URL" value={peopleDraft.profile_url} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, profile_url: e.target.value }))} placeholder="https://..." />
-                      </div>
                       <div className="space-y-2">
-                        <AdminInput label="Image URL" value={peopleDraft.image_url} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, image_url: e.target.value }))} placeholder="Image URL" />
-                        <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files?.[0], 'people', (url) => setPeopleDraft((prev) => ({ ...prev, image_url: url })))} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer" style={{ color: isDark ? '#9ca3af' : '#4b5563' }} />
+                        <label className="block text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Category</label>
+                        <select
+                          value={peopleDraft.category}
+                          onChange={(e) => {
+                            const nextCategory = e.target.value;
+                            setPeopleDraft((prev) => ({ ...prev, category: nextCategory }));
+                            if (isProgramCategory(nextCategory)) {
+                              setPeopleProgramMode('resource');
+                            }
+                          }}
+                          className="w-full px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          style={{
+                            backgroundColor: isDark ? '#374151' : '#ffffff',
+                            borderColor: isDark ? '#4b5563' : '#d1d5db',
+                            color: isDark ? '#ffffff' : '#111827'
+                          }}
+                        >
+                          {peopleCategoryOptions.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
                       </div>
-                      <AdminInput label="Resource Link" value={peopleDraft.resource_link} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, resource_link: e.target.value }))} placeholder="Link to CV, publications, etc." />
-                      <AdminTextarea label="Research Interests" value={peopleDraft.research_interests_text} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, research_interests_text: e.target.value }))} placeholder="Research interests, one per line" rows={3} />
-                      <AdminTextarea label="Responsibilities" value={peopleDraft.responsibilities_text} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, responsibilities_text: e.target.value }))} placeholder="Key responsibilities, one per line" rows={3} />
+
+                      {draftPeopleIsProgram ? (
+                        <>
+                          <AdminInput
+                            label="Year/Batch Label"
+                            value={peopleDraft.year_label}
+                            onChange={(e) => setPeopleDraft((prev) => ({ ...prev, year_label: e.target.value }))}
+                            placeholder="e.g., 2024 Batch"
+                          />
+
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Entry Type</label>
+                            <div className="grid sm:grid-cols-2 gap-3">
+                              <button
+                                type="button"
+                                onClick={() => setPeopleProgramMode('resource')}
+                                className="px-4 py-3 rounded-lg text-sm font-medium border text-left"
+                                style={{
+                                  borderColor: peopleProgramMode === 'resource' ? (isDark ? '#3b82f6' : '#2563eb') : (isDark ? '#4b5563' : '#d1d5db'),
+                                  backgroundColor: peopleProgramMode === 'resource' ? (isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe') : (isDark ? '#1f2937' : '#ffffff'),
+                                  color: isDark ? '#e5e7eb' : '#111827',
+                                }}
+                              >
+                                1. Upload List Link
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPeopleProgramMode('individual')}
+                                className="px-4 py-3 rounded-lg text-sm font-medium border text-left"
+                                style={{
+                                  borderColor: peopleProgramMode === 'individual' ? (isDark ? '#3b82f6' : '#2563eb') : (isDark ? '#4b5563' : '#d1d5db'),
+                                  backgroundColor: peopleProgramMode === 'individual' ? (isDark ? 'rgba(59,130,246,0.15)' : '#dbeafe') : (isDark ? '#1f2937' : '#ffffff'),
+                                  color: isDark ? '#e5e7eb' : '#111827',
+                                }}
+                              >
+                                2. Individual Students
+                              </button>
+                            </div>
+                          </div>
+
+                          {peopleProgramMode === 'resource' && (
+                            <AdminInput
+                              label="Resource Link"
+                              value={peopleDraft.resource_link}
+                              onChange={(e) => setPeopleDraft((prev) => ({ ...prev, resource_link: e.target.value }))}
+                              placeholder="https://..."
+                            />
+                          )}
+
+                          {peopleProgramMode === 'individual' && (
+                            <div className="rounded-lg border px-4 py-3 text-sm" style={{ borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#9ca3af' : '#4b5563' }}>
+                              Save this batch first. Then open it to add/edit students in a nested table and import CSV.
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <AdminInput label="Name" value={peopleDraft.name} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, name: e.target.value }))} placeholder="Full name" />
+
+                          {peopleDraft.category !== 'phd' && (
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <AdminInput label="Designation" value={peopleDraft.designation} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, designation: e.target.value }))} placeholder="e.g., Professor, Lab Assistant" />
+                              {peopleDraft.category === 'staff'
+                                ? <AdminInput label="Department" value={peopleDraft.department} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, department: e.target.value }))} placeholder="Department name" />
+                                : <AdminInput label="Specialization" value={peopleDraft.specialization} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, specialization: e.target.value }))} placeholder="Area of expertise" />}
+                            </div>
+                          )}
+
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <AdminInput label="Email" type="email" value={peopleDraft.email} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, email: e.target.value }))} placeholder="email@example.com" />
+                            <AdminInput label="Phone" value={peopleDraft.phone} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, phone: e.target.value }))} placeholder="+91..." />
+                          </div>
+
+                          {peopleDraft.category === 'faculty' && (
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <AdminInput label="Room/Office" value={peopleDraft.room} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, room: e.target.value }))} placeholder="e.g., Room 101" />
+                              <AdminInput label="Profile URL" value={peopleDraft.profile_url} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, profile_url: e.target.value }))} placeholder="https://..." />
+                            </div>
+                          )}
+
+                          <div className="space-y-2">
+                            <AdminInput label="Image URL" value={peopleDraft.image_url} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, image_url: e.target.value }))} placeholder="Image URL" />
+                            <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files?.[0], 'people', (url) => setPeopleDraft((prev) => ({ ...prev, image_url: url })))} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer" style={{ color: isDark ? '#9ca3af' : '#4b5563' }} />
+                          </div>
+
+                          {peopleDraft.category === 'faculty' && (
+                            <AdminTextarea label="Research Interests" value={peopleDraft.research_interests_text} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, research_interests_text: e.target.value }))} placeholder="Research interests, one per line" rows={3} />
+                          )}
+
+                          {peopleDraft.category === 'staff' && (
+                            <AdminTextarea label="Responsibilities" value={peopleDraft.responsibilities_text} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, responsibilities_text: e.target.value }))} placeholder="Key responsibilities, one per line" rows={3} />
+                          )}
+                        </>
+                      )}
+
                       <div className="grid md:grid-cols-2 gap-4">
                         <AdminInput label="Sort Order" type="number" value={peopleDraft.sort_order} onChange={(e) => setPeopleDraft((prev) => ({ ...prev, sort_order: e.target.value }))} />
                         <div className="flex items-center gap-3 pt-6">
@@ -3992,52 +4530,231 @@ const AdminDashboardContent = () => {
                     </div>
                   ) : (
                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                      <div className="flex items-start gap-4">
-                        {peopleSelectedItem?.image_url ? (
-                          <img src={resolveMediaUrl(peopleSelectedItem.image_url)} alt="" className="w-20 h-20 rounded-xl object-cover" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />
-                        ) : (
-                          <div className="w-20 h-20 rounded-xl flex items-center justify-center text-2xl font-medium" style={{ backgroundColor: isDark ? '#374151' : '#f3f4f6', color: isDark ? '#9ca3af' : '#6b7280' }}>
-                            {peopleSelectedItem?.name?.charAt(0).toUpperCase() || '?'}
+                      {selectedPeopleIsProgramBatch ? (
+                        <>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Category</p>
+                              <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>
+                                {peopleCategoryOptions.find(c => c.value === peopleSelectedItem?.category)?.label || peopleSelectedItem?.category}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Year/Batch</p>
+                              <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.year_label || '-'}</p>
+                            </div>
                           </div>
-                        )}
-                        <div>
-                          <h3 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>{peopleSelectedItem?.name}</h3>
-                          <p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{peopleSelectedItem?.designation || 'No designation'}</p>
-                          <span className="inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151' }}>
-                            {peopleCategoryOptions.find(c => c.value === peopleSelectedItem?.category)?.label || peopleSelectedItem?.category}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Specialization</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.specialization || '-'}</p></div>
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Department</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.department || '-'}</p></div>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Email</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.email || '-'}</p></div>
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Phone</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.phone || '-'}</p></div>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Room/Office</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.room || '-'}</p></div>
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Year/Batch</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.year_label || '-'}</p></div>
-                      </div>
-                      {peopleSelectedItem?.profile_url && (
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Profile URL</p><a href={peopleSelectedItem.profile_url} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{peopleSelectedItem.profile_url}</a></div>
-                      )}
-                      {peopleSelectedItem?.resource_link && (
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Resource Link</p><a href={peopleSelectedItem.resource_link} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{peopleSelectedItem.resource_link}</a></div>
-                      )}
-                      {peopleSelectedItem?.research_interests_text && (
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Research Interests</p><p className="text-sm whitespace-pre-line" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem.research_interests_text}</p></div>
-                      )}
-                      {peopleSelectedItem?.responsibilities_text && (
-                        <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Responsibilities</p><p className="text-sm whitespace-pre-line" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem.responsibilities_text}</p></div>
+                          <div>
+                            <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Mode</p>
+                            <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>
+                              {selectedPeopleProgramMode === 'resource' ? 'Upload list' : 'Individual students'}
+                            </p>
+                          </div>
+
+                          {selectedPeopleProgramMode === 'resource' ? (
+                            <div>
+                              <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Resource Link</p>
+                              {peopleSelectedItem?.resource_link ? (
+                                <a href={peopleSelectedItem.resource_link} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>
+                                  {peopleSelectedItem.resource_link}
+                                </a>
+                              ) : (
+                                <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>-</p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                  <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                                    Students in {peopleSelectedItem?.year_label || 'Batch'}
+                                  </h3>
+                                  <p className="text-xs" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                                    Manage individual students for this batch.
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <input
+                                    key={programStudentCsvInputKey}
+                                    id="program-student-csv-input"
+                                    type="file"
+                                    accept=".csv,text/csv"
+                                    className="hidden"
+                                    onChange={(event) => importProgramStudentsFromCsv(event.target.files?.[0])}
+                                  />
+                                  <AdminButton onClick={openProgramStudentCreate} disabled={isWorking}>+ Add Student</AdminButton>
+                                </div>
+                              </div>
+
+                              <div className="rounded-xl border overflow-x-auto" style={{ borderColor: isDark ? '#374151' : '#e5e7eb' }}>
+                                <table className="w-full text-sm">
+                                  <thead style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb' }}>
+                                    <tr>
+                                      <th className="text-left px-3 py-2" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Name</th>
+                                      <th className="text-left px-3 py-2" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Email</th>
+                                      <th className="text-left px-3 py-2" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Phone</th>
+                                      <th className="text-left px-3 py-2" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                                      <th className="text-right px-3 py-2" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {selectedProgramStudents.length === 0 ? (
+                                      <tr>
+                                        <td colSpan={5} className="px-3 py-4 text-center" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                                          No students added yet.
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                      selectedProgramStudents.map((student) => (
+                                        <tr key={student.id} style={{ borderTop: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                                          <td className="px-3 py-2" style={{ color: isDark ? '#d1d5db' : '#111827' }}>{student.name || '-'}</td>
+                                          <td className="px-3 py-2" style={{ color: isDark ? '#9ca3af' : '#4b5563' }}>{student.email || '-'}</td>
+                                          <td className="px-3 py-2" style={{ color: isDark ? '#9ca3af' : '#4b5563' }}>{student.phone || '-'}</td>
+                                          <td className="px-3 py-2" style={{ color: student.is_active ? '#10b981' : '#9ca3af' }}>{student.is_active ? 'Active' : 'Inactive'}</td>
+                                          <td className="px-3 py-2 text-right">
+                                            <div className="flex justify-end gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={() => openProgramStudentEdit(student)}
+                                                className="px-2 py-1 text-xs rounded-lg"
+                                                style={{ backgroundColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#e5e7eb' : '#111827' }}
+                                              >
+                                                Edit
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setProgramStudentSelectedItem(student);
+                                                  setProgramStudentConfirmDelete(true);
+                                                }}
+                                                className="px-2 py-1 text-xs rounded-lg"
+                                                style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                                              >
+                                                Delete
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-start gap-4">
+                            {peopleSelectedItem?.image_url ? (
+                              <img src={resolveMediaUrl(peopleSelectedItem.image_url)} alt="" className="w-20 h-20 rounded-xl object-cover" style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }} />
+                            ) : (
+                              <div className="w-20 h-20 rounded-xl flex items-center justify-center text-2xl font-medium" style={{ backgroundColor: isDark ? '#374151' : '#f3f4f6', color: isDark ? '#9ca3af' : '#6b7280' }}>
+                                {peopleSelectedItem?.name?.charAt(0).toUpperCase() || '?'}
+                              </div>
+                            )}
+                            <div>
+                              <h3 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>{peopleSelectedItem?.name}</h3>
+                              <p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{peopleSelectedItem?.designation || 'No designation'}</p>
+                              <span className="inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: isDark ? '#374151' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151' }}>
+                                {peopleCategoryOptions.find(c => c.value === peopleSelectedItem?.category)?.label || peopleSelectedItem?.category}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Specialization</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.specialization || '-'}</p></div>
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Department</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.department || '-'}</p></div>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Email</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.email || '-'}</p></div>
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Phone</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.phone || '-'}</p></div>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Room/Office</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.room || '-'}</p></div>
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Year/Batch</p><p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem?.year_label || '-'}</p></div>
+                          </div>
+                          {peopleSelectedItem?.profile_url && (
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Profile URL</p><a href={peopleSelectedItem.profile_url} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{peopleSelectedItem.profile_url}</a></div>
+                          )}
+                          {peopleSelectedItem?.resource_link && (
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Resource Link</p><a href={peopleSelectedItem.resource_link} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>{peopleSelectedItem.resource_link}</a></div>
+                          )}
+                          {peopleSelectedItem?.research_interests_text && (
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Research Interests</p><p className="text-sm whitespace-pre-line" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem.research_interests_text}</p></div>
+                          )}
+                          {peopleSelectedItem?.responsibilities_text && (
+                            <div><p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Responsibilities</p><p className="text-sm whitespace-pre-line" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{peopleSelectedItem.responsibilities_text}</p></div>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
                 </AdminModal>
 
-                <ConfirmationModal isOpen={peopleConfirmSave} onClose={() => setPeopleConfirmSave(false)} onConfirm={savePeopleEntry} title="Confirm Save" message="Save this person entry?" confirmText="Save" variant="info" isLoading={isWorking} />
-                <ConfirmationModal isOpen={peopleConfirmDelete} onClose={() => setPeopleConfirmDelete(false)} onConfirm={deletePeopleEntryItem} title="Confirm Delete" message="Delete this person entry?" confirmText="Delete" variant="danger" isLoading={isWorking} />
+                <ConfirmationModal isOpen={peopleConfirmSave} onClose={() => setPeopleConfirmSave(false)} onConfirm={savePeopleEntry} title="Confirm Save" message="Save this people entry?" confirmText="Save" variant="info" isLoading={isWorking} />
+                <ConfirmationModal isOpen={peopleConfirmDelete} onClose={() => setPeopleConfirmDelete(false)} onConfirm={deletePeopleEntryItem} title="Confirm Delete" message="Delete this people entry?" confirmText="Delete" variant="danger" isLoading={isWorking} />
+
+                <AdminModal
+                  isOpen={programStudentModalOpen}
+                  onClose={closeProgramStudentModal}
+                  title={programStudentSelectedItem ? 'Edit Student' : 'Add Student'}
+                  size="md"
+                  footer={
+                    <div className="flex justify-between gap-3">
+                      {programStudentSelectedItem ? (
+                        <AdminButton
+                          variant="danger"
+                          onClick={() => setProgramStudentConfirmDelete(true)}
+                          disabled={isWorking}
+                        >
+                          Delete
+                        </AdminButton>
+                      ) : <div />}
+                      <div className="flex gap-3">
+                        <AdminButton variant="secondary" onClick={closeProgramStudentModal} disabled={isWorking}>Cancel</AdminButton>
+                        <AdminButton onClick={saveProgramStudentEntry} disabled={isWorking}>Save</AdminButton>
+                      </div>
+                    </div>
+                  }
+                >
+                  <div className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <AdminInput label="Name" value={programStudentDraft.name} onChange={(e) => setProgramStudentDraft((prev) => ({ ...prev, name: e.target.value }))} placeholder="Student full name" />
+                      <AdminInput label="Email" type="email" value={programStudentDraft.email} onChange={(e) => setProgramStudentDraft((prev) => ({ ...prev, email: e.target.value }))} placeholder="student@iiti.ac.in" />
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <AdminInput label="Phone" value={programStudentDraft.phone} onChange={(e) => setProgramStudentDraft((prev) => ({ ...prev, phone: e.target.value }))} placeholder="+91..." />
+                      <AdminInput label="Sort Order" type="number" value={programStudentDraft.sort_order} onChange={(e) => setProgramStudentDraft((prev) => ({ ...prev, sort_order: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <AdminInput label="Image URL" value={programStudentDraft.image_url} onChange={(e) => setProgramStudentDraft((prev) => ({ ...prev, image_url: e.target.value }))} placeholder="Image URL" />
+                      <input type="file" accept="image/*" onChange={(e) => uploadImage(e.target.files?.[0], 'people', (url) => setProgramStudentDraft((prev) => ({ ...prev, image_url: url })))} className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer" style={{ color: isDark ? '#9ca3af' : '#4b5563' }} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="program-student-active"
+                        checked={Boolean(programStudentDraft.is_active)}
+                        onChange={(e) => setProgramStudentDraft((prev) => ({ ...prev, is_active: e.target.checked ? 1 : 0 }))}
+                        className="w-4 h-4 rounded"
+                      />
+                      <label htmlFor="program-student-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>
+                        Active
+                      </label>
+                    </div>
+                  </div>
+                </AdminModal>
+
+                <ConfirmationModal
+                  isOpen={programStudentConfirmDelete}
+                  onClose={() => setProgramStudentConfirmDelete(false)}
+                  onConfirm={deleteProgramStudentEntry}
+                  title="Confirm Delete"
+                  message="Delete this student entry?"
+                  confirmText="Delete"
+                  variant="danger"
+                  isLoading={isWorking}
+                />
               </>
             )}
 

@@ -12,12 +12,27 @@ const People = () => {
       return null;
     }
 
+    const normalizeProgramYears = (rows) =>
+      (Array.isArray(rows) ? rows : []).map((row) => {
+        const students = Array.isArray(row?.students) ? row.students : [];
+        const link = String(row?.link || '').trim();
+
+        return {
+          id: row?.id,
+          year: String(row?.year || '').trim(),
+          link,
+          mode: row?.mode || (link ? 'resource' : 'individual'),
+          students,
+          sort_order: Number.isFinite(Number(row?.sort_order)) ? Number(row.sort_order) : 0,
+        };
+      });
+
     return {
       regularFaculty: Array.isArray(data.regularFaculty) ? data.regularFaculty : [],
       staff: Array.isArray(data.staff) ? data.staff : [],
       phdStudents: Array.isArray(data.phdStudents) ? data.phdStudents : [],
-      mtechStudents: Array.isArray(data.mtechStudents) ? data.mtechStudents : [],
-      btechStudents: Array.isArray(data.btechStudents) ? data.btechStudents : [],
+      mtechStudents: normalizeProgramYears(data.mtechStudents),
+      btechStudents: normalizeProgramYears(data.btechStudents),
     };
   };
 
@@ -30,6 +45,7 @@ const People = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [specializationFilter, setSpecializationFilter] = useState('All');
   const [peopleContent, setPeopleContent] = useState(initialPeopleContent);
+  const [programYearModal, setProgramYearModal] = useState({ isOpen: false, entry: null });
   const [peopleLoadState, setPeopleLoadState] = useState(
     hasInitialCachedPeopleContent ? 'ready' : 'fallback'
   );
@@ -611,16 +627,16 @@ const People = () => {
     { name: 'Yogendra Bihare', image: '/assets/stu_images/phd/Yogendra Bihare.jpg', email: 'phd2501104013@iiti.ac.in' },
 ];  
   const mtechStudents = [
-    { year: '2025 Batch', link: '/assets/student_lists/M.tech Student List 2025.pdf' },
-    { year: '2024 Batch', link: '/assets/student_lists/M.tech Student List 2024.pdf' },
+    { year: '2025 Batch', link: '/assets/student_lists/M.tech Student List 2025.pdf', mode: 'resource', students: [] },
+    { year: '2024 Batch', link: '/assets/student_lists/M.tech Student List 2024.pdf', mode: 'resource', students: [] },
   ];
 
   const btechStudents = [
-    { year: '2025 Batch', link: '/assets/student_lists/B.tech Student List 2025.pdf' },
-    { year: '2024 Batch', link: '/assets/student_lists/B.tech Student List 2024.pdf' },
-    { year: '2023 Batch', link: '/assets/student_lists/B.tech Student List 2023.pdf' },
-    { year: '2022 Batch', link: '/assets/student_lists/B.tech Student List 2022.pdf' },
-    { year: '2021 Batch', link: '/assets/student_lists/B.tech Student List 2021.pdf' },
+    { year: '2025 Batch', link: '/assets/student_lists/B.tech Student List 2025.pdf', mode: 'resource', students: [] },
+    { year: '2024 Batch', link: '/assets/student_lists/B.tech Student List 2024.pdf', mode: 'resource', students: [] },
+    { year: '2023 Batch', link: '/assets/student_lists/B.tech Student List 2023.pdf', mode: 'resource', students: [] },
+    { year: '2022 Batch', link: '/assets/student_lists/B.tech Student List 2022.pdf', mode: 'resource', students: [] },
+    { year: '2021 Batch', link: '/assets/student_lists/B.tech Student List 2021.pdf', mode: 'resource', students: [] },
   ];
 
   const isBackendPeopleLoaded = peopleLoadState === 'ready' && Boolean(peopleContent);
@@ -853,6 +869,11 @@ const People = () => {
 
     const styles = styleConfig[activeTab] || styleConfig.default;
     const { IconComponent } = styles;
+    const isResourceMode = (studentYear?.mode || '').toLowerCase() === 'resource' && Boolean(studentYear?.link);
+
+    const openProgramYearModal = () => {
+      setProgramYearModal({ isOpen: true, entry: studentYear });
+    };
 
     return (
       <div key={index} className="bg-white rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
@@ -862,20 +883,39 @@ const People = () => {
               <IconComponent className={`h-10 w-10 ${styles.iconColor}`} />
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">{studentYear.year}</h3>
-            <p className="text-gray-600 text-sm mb-4">List of Students</p>
-            <a
-              href={resolveMediaUrl(studentYear.link)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`inline-flex items-center px-4 py-2 ${styles.btnBg} text-white text-sm font-medium rounded-lg ${styles.btnHover} transition-colors`}
-            >
-              View
-              <ExternalLink className="h-4 w-4 ml-2" />
-            </a>
+            <p className="text-gray-600 text-sm mb-4">
+              {isResourceMode
+                ? 'List of Students'
+                : `${Array.isArray(studentYear.students) ? studentYear.students.length : 0} students available`}
+            </p>
+            {isResourceMode ? (
+              <a
+                href={resolveMediaUrl(studentYear.link)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center px-4 py-2 ${styles.btnBg} text-white text-sm font-medium rounded-lg ${styles.btnHover} transition-colors`}
+              >
+                View List
+                <ExternalLink className="h-4 w-4 ml-2" />
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={openProgramYearModal}
+                className={`inline-flex items-center px-4 py-2 ${styles.btnBg} text-white text-sm font-medium rounded-lg ${styles.btnHover} transition-colors`}
+              >
+                View Students
+                <Users className="h-4 w-4 ml-2" />
+              </button>
+            )}
           </div>
         </div>
       </div>
     );
+  };
+
+  const closeProgramYearModal = () => {
+    setProgramYearModal({ isOpen: false, entry: null });
   };
 
   const currentData = getCurrentData();
@@ -932,6 +972,10 @@ const People = () => {
         return 'Search...';
     }
   };
+
+  const programYearModalStudents = Array.isArray(programYearModal.entry?.students)
+    ? programYearModal.entry.students
+    : [];
 
 
   return (
@@ -1020,6 +1064,68 @@ const People = () => {
           {renderGrid()}
         </div>
       </section>
+
+      {programYearModal.isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={closeProgramYearModal}
+        >
+          <div
+            className="w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {programYearModal.entry?.year || 'Batch'} Students
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {activeTab === 'mtech' ? 'M.Tech' : 'B.Tech'} individual student list
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeProgramYearModal}
+                className="px-3 py-1.5 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[75vh]">
+              {programYearModalStudents.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">No students available for this batch yet.</div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {programYearModalStudents.map((student, index) => (
+                    <div key={`${student.id || student.name || 'student'}-${index}`} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                      <img
+                        src={resolveMediaUrl(student.image || fallbackStudentImage)}
+                        alt={student.name || 'Student'}
+                        className="w-full h-40 object-cover rounded-md mb-3 bg-gray-200"
+                        loading="lazy"
+                        decoding="async"
+                        onError={(event) => {
+                          event.currentTarget.onerror = null;
+                          event.currentTarget.src = resolveMediaUrl(fallbackStudentImage);
+                        }}
+                      />
+                      <h4 className="text-sm font-semibold text-gray-900 truncate">{student.name || '-'}</h4>
+                      {student.email && (
+                        <a href={`mailto:${student.email}`} className="text-xs text-blue-600 hover:underline block truncate mt-1">
+                          {student.email}
+                        </a>
+                      )}
+                      {student.phone && (
+                        <p className="text-xs text-gray-600 truncate mt-1">{student.phone}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Statistics */}
       <section className="py-20 bg-gradient-to-r from-blue-800 to-blue-600">
