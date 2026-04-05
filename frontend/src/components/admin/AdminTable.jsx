@@ -26,12 +26,25 @@ const AdminTable = ({
     if (onView) onView(item);
   };
 
+  const closeViewModal = () => {
+    setViewModal({ isOpen: false, item: null });
+  };
+
   const handleEditClick = (item) => {
     setEditModal({ isOpen: true, item, draft: { ...item } });
   };
 
   const handleDeleteClick = (item) => {
     setDeleteModal({ isOpen: true, item });
+  };
+
+  const handleDeleteFromView = () => {
+    if (!viewModal.item) {
+      return;
+    }
+
+    setDeleteModal({ isOpen: true, item: viewModal.item });
+    closeViewModal();
   };
 
   const handleEditSave = async () => {
@@ -150,28 +163,41 @@ const AdminTable = ({
       {/* View Modal */}
       <AdminModal
         isOpen={viewModal.isOpen}
-        onClose={() => setViewModal({ isOpen: false, item: null })}
+        onClose={closeViewModal}
         title={viewTitle}
         size="lg"
         footer={
-          <div className="flex justify-end gap-3">
-            {onEdit && (
+          <div className={`flex items-center ${onDelete ? 'justify-between' : 'justify-end'} gap-3`}>
+            <div>
+              {onDelete && (
+                <button
+                  onClick={handleDeleteFromView}
+                  disabled={isWorking}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {onEdit && (
+                <button
+                  onClick={() => {
+                    closeViewModal();
+                    handleEditClick(viewModal.item);
+                  }}
+                  className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+                >
+                  Edit
+                </button>
+              )}
               <button
-                onClick={() => {
-                  setViewModal({ isOpen: false, item: null });
-                  handleEditClick(viewModal.item);
-                }}
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+                onClick={closeViewModal}
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 transition-colors"
               >
-                Edit
+                Close
               </button>
-            )}
-            <button
-              onClick={() => setViewModal({ isOpen: false, item: null })}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 transition-colors"
-            >
-              Close
-            </button>
+            </div>
           </div>
         }
       >

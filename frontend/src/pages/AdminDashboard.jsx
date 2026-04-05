@@ -36,7 +36,7 @@ import {
   uploadAdminImage,
 } from '../lib/contentApi';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
-import { AdminModal, AdminButton, AdminInput, AdminTextarea, AdminCard, ConfirmationModal } from '../components/admin';
+import { AdminModal, AdminButton, AdminInput, AdminTextarea, AdminCard, AdminTable, ConfirmationModal } from '../components/admin';
 import './admin.css';
 
 // ============================================
@@ -1970,6 +1970,182 @@ const AdminDashboardContent = () => {
     }));
   };
 
+  const getEventTableRows = (field) =>
+    (Array.isArray(eventsContent[field]) ? eventsContent[field] : []).map((event, index) => ({
+      ...event,
+      __rowIndex: index,
+      __rowId: `${field}-${index}`,
+    }));
+
+  const eventTableColumns = [
+    {
+      key: 'title',
+      label: 'Title',
+      render: (value) => (
+        <span className="font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+          {value || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'date',
+      label: 'Date',
+      render: (value) => value || '-',
+    },
+    {
+      key: 'venue',
+      label: 'Venue',
+      render: (value) => value || '-',
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      render: (value) => (
+        <span className="px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : '#dbeafe', color: isDark ? '#93c5fd' : '#1d4ed8' }}>
+          {value || 'General'}
+        </span>
+      ),
+    },
+    {
+      key: 'image_url',
+      label: 'Image',
+      render: (value) =>
+        value ? (
+          <img
+            src={resolveMediaUrl(value)}
+            alt=""
+            className="h-10 w-16 object-cover rounded"
+            style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}
+          />
+        ) : (
+          '-'
+        ),
+    },
+  ];
+
+  const saveEventRowItem = async (field, draft) => {
+    const rowIndex = toInteger(draft?.__rowIndex, -1);
+
+    if (rowIndex < 0) {
+      return false;
+    }
+
+    const nextEvent = {
+      ...defaultEventsItem,
+      date: draft?.date || '',
+      title: draft?.title || '',
+      description: draft?.description || '',
+      time: draft?.time || '',
+      venue: draft?.venue || '',
+      category: draft?.category || 'Seminar',
+      image_url: draft?.image_url || '',
+      registration_link: draft?.registration_link || '',
+    };
+
+    updateEventItem(field, rowIndex, nextEvent);
+    return true;
+  };
+
+  const deleteEventRowItem = async (field, row) => {
+    const rowIndex = toInteger(row?.__rowIndex, -1);
+
+    if (rowIndex < 0) {
+      return false;
+    }
+
+    removeEventItem(field, rowIndex);
+    return true;
+  };
+
+  const renderEventViewContent = (event) => (
+    <div className="space-y-4">
+      {event?.image_url && (
+        <img
+          src={resolveMediaUrl(event.image_url)}
+          alt={event?.title || 'Event image'}
+          className="w-full h-52 object-cover rounded-lg"
+          style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}
+        />
+      )}
+      <div className="grid md:grid-cols-2 gap-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Title</p>
+          <p className="text-sm" style={{ color: isDark ? '#ffffff' : '#111827' }}>{event?.title || '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Date</p>
+          <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{event?.date || '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Time</p>
+          <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{event?.time || '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Venue</p>
+          <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{event?.venue || '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Category</p>
+          <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{event?.category || '-'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Registration Link</p>
+          {event?.registration_link ? (
+            <a href={event.registration_link} target="_blank" rel="noopener noreferrer" className="text-sm underline" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>
+              {event.registration_link}
+            </a>
+          ) : (
+            <p className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>-</p>
+          )}
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Description</p>
+        <p className="text-sm whitespace-pre-wrap" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{event?.description || '-'}</p>
+      </div>
+    </div>
+  );
+
+  const renderEventEditContent = (field, draft, updateDraft) => (
+    <div className="space-y-4">
+      <div className="grid md:grid-cols-2 gap-4">
+        <AdminInput label="Title" value={draft?.title || ''} onChange={(e) => updateDraft('title', e.target.value)} placeholder="Event title" />
+        <AdminInput label="Date" value={draft?.date || ''} onChange={(e) => updateDraft('date', e.target.value)} placeholder="e.g., 2024-06-15" />
+        <AdminInput label="Time" value={draft?.time || ''} onChange={(e) => updateDraft('time', e.target.value)} placeholder="e.g., 10:30 AM" />
+        <AdminInput label="Venue" value={draft?.venue || ''} onChange={(e) => updateDraft('venue', e.target.value)} placeholder="Event venue" />
+        <AdminInput label="Category" value={draft?.category || ''} onChange={(e) => updateDraft('category', e.target.value)} placeholder="Seminar" />
+        <AdminInput label="Registration Link" value={draft?.registration_link || ''} onChange={(e) => updateDraft('registration_link', e.target.value)} placeholder="https://..." />
+      </div>
+
+      <div className="space-y-2">
+        <AdminInput label="Event Image URL" value={draft?.image_url || ''} onChange={(e) => updateDraft('image_url', e.target.value)} placeholder="Image URL" />
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => uploadImage(e.target.files?.[0], 'events', (url) => updateDraft('image_url', url))}
+          className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:cursor-pointer"
+          style={{ color: isDark ? '#9ca3af' : '#4b5563' }}
+        />
+        {draft?.image_url && (
+          <img
+            src={resolveMediaUrl(draft.image_url)}
+            alt="Preview"
+            className="h-28 w-auto rounded-lg"
+            style={{ border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}
+          />
+        )}
+      </div>
+
+      <AdminTextarea label="Description" value={draft?.description || ''} onChange={(e) => updateDraft('description', e.target.value)} placeholder="Event description" rows={4} />
+
+      {field === 'past_events' && (
+        <p className="text-xs" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+          Tip: upload event photos for better past-events cards on the public page.
+        </p>
+      )}
+    </div>
+  );
+
   // ============================================
   // SPECIALIZATIONS CONTENT HANDLERS
   // ============================================
@@ -2139,21 +2315,22 @@ const AdminDashboardContent = () => {
 
   return (
     <div 
-      className="min-h-screen"
+      className="min-h-screen flex flex-col"
       style={{
         backgroundColor: isDark ? '#111827' : '#f8fafc'
       }}
     >
-      {/* Header */}
+      {/* Header - Fixed at top */}
       <header 
-        className="sticky top-0 z-30 backdrop-blur-lg"
+        className="fixed top-0 left-0 right-0 z-40 backdrop-blur-lg"
         style={{
-          backgroundColor: isDark ? 'rgba(31, 41, 55, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-          borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`
+          backgroundColor: isDark ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+          borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+          height: '64px'
         }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+        <div className="h-full px-6">
+          <div className="flex items-center justify-between h-full">
             {/* Left side */}
             <div className="flex items-center gap-4">
               {/* Mobile menu button */}
@@ -2247,101 +2424,101 @@ const AdminDashboardContent = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-6">
-          {/* Sidebar Overlay for mobile */}
-          {sidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
+      {/* Main container with sidebar and content */}
+      <div className="flex flex-1" style={{ marginTop: '64px' }}>
+        {/* Sidebar Overlay for mobile */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-          {/* Sidebar */}
-          <aside
-            className={`
-              fixed lg:sticky top-0 lg:top-24 left-0 z-50 lg:z-0
-              w-72 lg:w-64 h-screen lg:h-auto max-h-[calc(100vh-6rem)]
-              lg:rounded-2xl shadow-xl lg:shadow-sm
-              transform transition-transform duration-300
-              ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-              overflow-y-auto
-            `}
-            style={{
-              backgroundColor: isDark ? '#1f2937' : '#ffffff',
-              borderRight: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
-              borderWidth: '1px',
-              borderColor: isDark ? '#374151' : '#e5e7eb'
-            }}
+        {/* Sidebar - Fixed on left */}
+        <aside
+          className={`
+            fixed lg:fixed top-16 left-0 bottom-0 z-40
+            w-64 overflow-y-auto
+            transform lg:transform-none
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          `}
+          style={{
+            backgroundColor: isDark ? '#1f2937' : '#ffffff',
+            borderRight: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`
+          }}
+        >
+          {/* Mobile close button */}
+          <div 
+            className="lg:hidden flex items-center justify-between px-4 py-3"
+            style={{ borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}
           >
-            {/* Mobile close button */}
-            <div 
-              className="lg:hidden flex items-center justify-between p-4"
-              style={{ borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}
+            <span 
+              className="font-semibold text-sm"
+              style={{ color: isDark ? '#ffffff' : '#111827' }}
             >
-              <span 
-                className="font-semibold"
-                style={{ color: isDark ? '#ffffff' : '#111827' }}
-              >
-                Menu
-              </span>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="p-2 rounded-lg"
-                style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
+              Menu
+            </span>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1.5 rounded-lg"
+              style={{ color: isDark ? '#9ca3af' : '#6b7280' }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
 
-            <nav className="p-4 space-y-6">
-              {adminSectionGroups.map((group) => (
-                <div key={group.label}>
-                  <div className="flex items-center gap-2 px-3 mb-3">
-                    <span style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>{group.icon}</span>
-                    <span 
-                      className="text-xs font-semibold uppercase tracking-wider"
-                      style={{ color: isDark ? '#6b7280' : '#9ca3af' }}
-                    >
-                      {group.label}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    {group.sections.map((section) => {
-                      const isActive = activeSection === section.key;
-                      return (
-                        <button
-                          key={section.key}
-                          onClick={() => {
-                            clearMessages();
-                            setActiveSection(section.key);
-                            setSidebarOpen(false);
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium"
-                          style={{
-                            backgroundColor: isActive 
-                              ? '#2563eb' 
-                              : 'transparent',
-                            color: isActive 
-                              ? '#ffffff' 
-                              : (isDark ? '#9ca3af' : '#4b5563'),
-                          }}
-                        >
-                          <SectionIcon name={section.icon} className="w-5 h-5" />
-                          <span>{section.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+          <nav className="p-3 space-y-4">
+            {adminSectionGroups.map((group) => (
+              <div key={group.label}>
+                <div className="flex items-center gap-2 px-2 mb-2">
+                  <span style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>{group.icon}</span>
+                  <span 
+                    className="text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: isDark ? '#6b7280' : '#9ca3af' }}
+                  >
+                    {group.label}
+                  </span>
                 </div>
-              ))}
-            </nav>
-          </aside>
+                <div className="space-y-0.5">
+                  {group.sections.map((section) => {
+                    const isActive = activeSection === section.key;
+                    return (
+                      <button
+                        key={section.key}
+                        onClick={() => {
+                          clearMessages();
+                          setActiveSection(section.key);
+                          setSidebarOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium"
+                        style={{
+                          backgroundColor: isActive 
+                            ? '#2563eb' 
+                            : 'transparent',
+                          color: isActive 
+                            ? '#ffffff' 
+                            : (isDark ? '#9ca3af' : '#4b5563'),
+                        }}
+                      >
+                        <SectionIcon name={section.icon} className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">{section.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+        </aside>
 
-          {/* Main Content */}
-          <main className="flex-1 min-w-0 space-y-6">
+        {/* Main Content - Takes remaining space */}
+        <main 
+          className="flex-1 lg:ml-64 min-w-0 p-6 overflow-y-auto"
+          style={{ maxHeight: 'calc(100vh - 64px)' }}
+        >
+          <div className="space-y-6">
             {/* Messages */}
             {error && (
               <div 
@@ -2397,39 +2574,32 @@ const AdminDashboardContent = () => {
               </div>
             )}
 
-            {/* Section Header */}
-            <AdminCard
-              title={sectionDetails[activeSection]?.title || 'Admin Section'}
-              subtitle={sectionDetails[activeSection]?.description || ''}
-              icon={<SectionIcon name={adminSectionGroups.flatMap(g => g.sections).find(s => s.key === activeSection)?.icon || 'settings'} />}
-            >
-              {/* Mobile section selector */}
-              <div className="lg:hidden">
-                <select
-                  value={activeSection}
-                  onChange={(e) => {
-                    clearMessages();
-                    setActiveSection(e.target.value);
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl text-sm"
-                  style={{
-                    backgroundColor: isDark ? '#374151' : '#f9fafb',
-                    border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`,
-                    color: isDark ? '#ffffff' : '#111827'
-                  }}
-                >
-                  {adminSectionGroups.map((group) => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.sections.map((section) => (
-                        <option key={section.key} value={section.key}>
-                          {section.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-            </AdminCard>
+            {/* Mobile section selector */}
+            <div className="lg:hidden mb-6">
+              <select
+                value={activeSection}
+                onChange={(e) => {
+                  clearMessages();
+                  setActiveSection(e.target.value);
+                }}
+                className="w-full px-4 py-2.5 rounded-xl text-sm"
+                style={{
+                  backgroundColor: isDark ? '#374151' : '#f9fafb',
+                  border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`,
+                  color: isDark ? '#ffffff' : '#111827'
+                }}
+              >
+                {adminSectionGroups.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.sections.map((section) => (
+                      <option key={section.key} value={section.key}>
+                        {section.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
 
             {/* Site Settings Section */}
             {activeSection === 'site-settings' && (
@@ -4269,26 +4439,21 @@ const AdminDashboardContent = () => {
                         <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Upcoming Events</h3>
                         {eventsEditMode && <AdminButton size="sm" onClick={() => addEventItem('upcoming_events')}>+ Add Event</AdminButton>}
                       </div>
-                      <div className="space-y-4">
-                        {(eventsContent.upcoming_events || []).map((event, idx) => (
-                          <div key={idx} className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
-                            <div className="flex items-start justify-between mb-3">
-                              <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#9ca3af' : '#6b7280' }}>Event {idx + 1}</span>
-                              {eventsEditMode && <button onClick={() => removeEventItem('upcoming_events', idx)} className="p-1 text-red-500 hover:bg-red-50 rounded"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>}
-                            </div>
-                            <div className="grid md:grid-cols-2 gap-3">
-                              <input type="text" value={event.title} onChange={(e) => updateEventItem('upcoming_events', idx, { title: e.target.value })} disabled={!eventsEditMode} placeholder="Title" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                              <input type="text" value={event.date} onChange={(e) => updateEventItem('upcoming_events', idx, { date: e.target.value })} disabled={!eventsEditMode} placeholder="Date (e.g., 2024-06-15)" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                              <input type="text" value={event.time} onChange={(e) => updateEventItem('upcoming_events', idx, { time: e.target.value })} disabled={!eventsEditMode} placeholder="Time" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                              <input type="text" value={event.venue} onChange={(e) => updateEventItem('upcoming_events', idx, { venue: e.target.value })} disabled={!eventsEditMode} placeholder="Venue" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                              <input type="text" value={event.category} onChange={(e) => updateEventItem('upcoming_events', idx, { category: e.target.value })} disabled={!eventsEditMode} placeholder="Category" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                              <input type="text" value={event.registration_link} onChange={(e) => updateEventItem('upcoming_events', idx, { registration_link: e.target.value })} disabled={!eventsEditMode} placeholder="Registration Link" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                            </div>
-                            <textarea value={event.description} onChange={(e) => updateEventItem('upcoming_events', idx, { description: e.target.value })} disabled={!eventsEditMode} placeholder="Description" rows={2} className="mt-3 w-full px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                          </div>
-                        ))}
-                        {(eventsContent.upcoming_events || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No upcoming events</p>}
-                      </div>
+                      <AdminTable
+                        columns={eventTableColumns}
+                        data={getEventTableRows('upcoming_events')}
+                        getRowId={(row) => row.__rowId}
+                        showActions={false}
+                        onEdit={eventsEditMode ? (draft) => saveEventRowItem('upcoming_events', draft) : undefined}
+                        onDelete={eventsEditMode ? (row) => deleteEventRowItem('upcoming_events', row) : undefined}
+                        renderViewContent={renderEventViewContent}
+                        renderEditContent={(draft, updateDraft) => renderEventEditContent('upcoming_events', draft, updateDraft)}
+                        viewTitle="Upcoming Event Details"
+                        editTitle="Edit Upcoming Event"
+                        deleteTitle="Delete Upcoming Event"
+                        emptyMessage={eventsContent.no_upcoming_message || 'No upcoming events'}
+                        isWorking={isWorking}
+                      />
                     </div>
 
                     {/* Past Events */}
@@ -4297,24 +4462,21 @@ const AdminDashboardContent = () => {
                         <h3 className="text-sm font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>Past Events</h3>
                         {eventsEditMode && <AdminButton size="sm" onClick={() => addEventItem('past_events')}>+ Add Event</AdminButton>}
                       </div>
-                      <div className="space-y-4">
-                        {(eventsContent.past_events || []).map((event, idx) => (
-                          <div key={idx} className="p-4 rounded-lg" style={{ backgroundColor: isDark ? '#374151' : '#ffffff', border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}` }}>
-                            <div className="flex items-start justify-between mb-3">
-                              <span className="text-xs font-medium px-2 py-1 rounded" style={{ backgroundColor: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#9ca3af' : '#6b7280' }}>Past Event {idx + 1}</span>
-                              {eventsEditMode && <button onClick={() => removeEventItem('past_events', idx)} className="p-1 text-red-500 hover:bg-red-50 rounded"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>}
-                            </div>
-                            <div className="grid md:grid-cols-2 gap-3">
-                              <input type="text" value={event.title} onChange={(e) => updateEventItem('past_events', idx, { title: e.target.value })} disabled={!eventsEditMode} placeholder="Title" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                              <input type="text" value={event.date} onChange={(e) => updateEventItem('past_events', idx, { date: e.target.value })} disabled={!eventsEditMode} placeholder="Date" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                              <input type="text" value={event.venue} onChange={(e) => updateEventItem('past_events', idx, { venue: e.target.value })} disabled={!eventsEditMode} placeholder="Venue" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                              <input type="text" value={event.category} onChange={(e) => updateEventItem('past_events', idx, { category: e.target.value })} disabled={!eventsEditMode} placeholder="Category" className="px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                            </div>
-                            <textarea value={event.description} onChange={(e) => updateEventItem('past_events', idx, { description: e.target.value })} disabled={!eventsEditMode} placeholder="Description" rows={2} className="mt-3 w-full px-3 py-2 rounded-lg text-sm border" style={{ backgroundColor: isDark ? '#1f2937' : '#ffffff', borderColor: isDark ? '#4b5563' : '#d1d5db', color: isDark ? '#ffffff' : '#111827' }} />
-                          </div>
-                        ))}
-                        {(eventsContent.past_events || []).length === 0 && <p className="text-sm text-center py-4" style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>No past events</p>}
-                      </div>
+                      <AdminTable
+                        columns={eventTableColumns}
+                        data={getEventTableRows('past_events')}
+                        getRowId={(row) => row.__rowId}
+                        showActions={false}
+                        onEdit={eventsEditMode ? (draft) => saveEventRowItem('past_events', draft) : undefined}
+                        onDelete={eventsEditMode ? (row) => deleteEventRowItem('past_events', row) : undefined}
+                        renderViewContent={renderEventViewContent}
+                        renderEditContent={(draft, updateDraft) => renderEventEditContent('past_events', draft, updateDraft)}
+                        viewTitle="Past Event Details"
+                        editTitle="Edit Past Event"
+                        deleteTitle="Delete Past Event"
+                        emptyMessage={eventsContent.no_past_message || 'No past events'}
+                        isWorking={isWorking}
+                      />
                     </div>
                   </div>
                 </AdminCard>
@@ -4417,8 +4579,8 @@ const AdminDashboardContent = () => {
                 <ConfirmationModal isOpen={specializationsConfirmSave} onClose={() => setSpecializationsConfirmSave(false)} onConfirm={saveSpecializationsContentHandler} title="Confirm Save" message="Save specializations page content?" confirmText="Save" variant="info" isLoading={isWorking} />
               </>
             )}
-          </main>
-        </div>
+          </div>
+        </main>
       </div>
     </div>
   );
