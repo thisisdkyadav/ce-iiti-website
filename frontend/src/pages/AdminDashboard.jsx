@@ -1555,7 +1555,7 @@ const AdminDashboardContent = () => {
 
   const openNewsView = (item) => {
     setNewsSelectedItem(item);
-    setNewsDraft({ ...item });
+    setNewsDraft({ ...item, publish_date: formatDateTimeLocal(item?.publish_date) });
     setNewsEditMode(false);
     setNewsModalOpen(true);
   };
@@ -1571,16 +1571,43 @@ const AdminDashboardContent = () => {
     setNewsModalOpen(false);
     setNewsSelectedItem(null);
     setNewsEditMode(false);
+    setNewsConfirmSave(false);
+    setNewsConfirmDelete(false);
   };
 
   const saveNewsItemEntry = async () => {
+    setNewsConfirmSave(false);
+
+    const title = String(newsDraft.title || '').trim();
+    const excerpt = String(newsDraft.excerpt || '').trim();
+    const category = String(newsDraft.category || 'News').trim() || 'News';
+    const publishDateIso = toIsoDateTime(newsDraft.publish_date);
+
+    if (!title) {
+      setError('News title is required.');
+      setSuccessMessage('');
+      return;
+    }
+
+    if (!excerpt) {
+      setError('News excerpt is required.');
+      setSuccessMessage('');
+      return;
+    }
+
+    if (!publishDateIso) {
+      setError('Please provide a valid publish date and time.');
+      setSuccessMessage('');
+      return;
+    }
+
     const payload = {
-      title: newsDraft.title,
-      excerpt: newsDraft.excerpt,
-      category: newsDraft.category,
-      image_url: newsDraft.image_url,
-      external_link: newsDraft.external_link,
-      publish_date: toIsoDateTime(newsDraft.publish_date),
+      title,
+      excerpt,
+      category,
+      image_url: toNullableString(newsDraft.image_url),
+      external_link: toNullableString(newsDraft.external_link),
+      publish_date: publishDateIso,
       is_active: newsDraft.is_active ? 1 : 0,
     };
 
