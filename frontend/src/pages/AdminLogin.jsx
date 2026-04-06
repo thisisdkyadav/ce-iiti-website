@@ -356,10 +356,10 @@ const LoginForm = () => {
               disabled={isLoading}
               className="w-full py-3.5 text-white font-semibold rounded-xl shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               style={{
-                backgroundColor: isDark ? '#374151' : '#111827',
+                backgroundColor: '#2563eb',
                 boxShadow: isDark
-                  ? '0 4px 14px rgba(17, 24, 39, 0.25)'
-                  : '0 4px 14px rgba(17, 24, 39, 0.18)'
+                  ? '0 4px 14px rgba(37, 99, 235, 0.35)'
+                  : '0 4px 14px rgba(37, 99, 235, 0.28)'
               }}
             >
               {isLoading ? (
