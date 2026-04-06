@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   adminLogout,
+  createAdminUser,
   createPeopleEntry,
   createFooterLink,
   createHeroSlide,
@@ -17,6 +18,7 @@ import {
   deletePeopleEntry,
   deleteSocialLink,
   fetchAdminContent,
+  fetchAdminUsers,
   fetchContactSubmissions,
   fetchAdminSession,
   resolveMediaUrl,
@@ -25,6 +27,7 @@ import {
   updateHeroSlide,
   updateAcademicsContent,
   updateAboutContent,
+  updateAdminUser,
   updateContactContent,
   updateEventsContent,
   updateSpecializationsContent,
@@ -357,6 +360,21 @@ const defaultProgramStudentDraft = {
   is_active: 1,
 };
 
+const defaultManagedAdminUserDraft = {
+  username: '',
+  password: '',
+  full_name: '',
+  google_email: '',
+  role: 'admin',
+  allowed_sections: ['site-settings'],
+  is_active: 1,
+};
+
+const managedAdminRoleOptions = [
+  { value: 'super_admin', label: 'Super Admin' },
+  { value: 'admin', label: 'Admin' },
+];
+
 const peopleCategoryOptions = [
   { value: 'faculty', label: 'Faculty' },
   { value: 'staff', label: 'Staff' },
@@ -531,6 +549,15 @@ const adminSectionGroups = [
     ),
     sections: [{ key: 'people', label: 'People Directory', icon: 'users' }],
   },
+  {
+    label: 'Administration',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5m10 0v-2a2 2 0 00-2-2H9a2 2 0 00-2 2v2m10 0H7m8-10a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    sections: [{ key: 'user-access', label: 'Admin Access', icon: 'users' }],
+  },
 ];
 
 const sectionDetails = {
@@ -593,6 +620,10 @@ const sectionDetails = {
   people: {
     title: 'People Directory',
     description: 'Manage faculty, staff, students, and student list links.',
+  },
+  'user-access': {
+    title: 'Admin Access',
+    description: 'Create admins/super admins and control sidebar access by section.',
   },
 };
 
@@ -659,6 +690,47 @@ function toStringArrayFromText(value) {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+const allSectionKeys = adminSectionGroups.flatMap((group) =>
+  group.sections.map((section) => section.key)
+);
+const nonSuperAdminSectionKeys = allSectionKeys.filter(
+  (sectionKey) => sectionKey !== 'user-access'
+);
+
+function normalizeAllowedSectionsForUi(allowedSections) {
+  const source = Array.isArray(allowedSections) ? allowedSections : [];
+  const unique = [];
+  const seen = new Set();
+
+  for (const rawSection of source) {
+    const section = String(rawSection || '').trim();
+    if (!section || !nonSuperAdminSectionKeys.includes(section) || seen.has(section)) {
+      continue;
+    }
+
+    seen.add(section);
+    unique.push(section);
+  }
+
+  return unique;
+}
+
+function canAccessSection(adminUser, sectionKey) {
+  if (!adminUser) {
+    return false;
+  }
+
+  if (adminUser.role === 'super_admin') {
+    return true;
+  }
+
+  if (sectionKey === 'user-access') {
+    return false;
+  }
+
+  return normalizeAllowedSectionsForUi(adminUser.allowedSections).includes(sectionKey);
 }
 
 function normalizePeopleEntryForUi(entry) {
@@ -893,6 +965,13 @@ const AdminDashboardContent = () => {
   const [contactSubmissionModalOpen, setContactSubmissionModalOpen] = useState(false);
   const [contactSubmissionSelectedItem, setContactSubmissionSelectedItem] = useState(null);
 
+  // Admin access management
+  const [managedAdminUsers, setManagedAdminUsers] = useState([]);
+  const [managedAdminSections, setManagedAdminSections] = useState(nonSuperAdminSectionKeys);
+  const [managedAdminModalOpen, setManagedAdminModalOpen] = useState(false);
+  const [managedAdminSelectedItem, setManagedAdminSelectedItem] = useState(null);
+  const [managedAdminDraft, setManagedAdminDraft] = useState(defaultManagedAdminUserDraft);
+
   // About Content editing
   const [aboutEditMode, setAboutEditMode] = useState(false);
   const [aboutConfirmSave, setAboutConfirmSave] = useState(false);
@@ -945,7 +1024,44 @@ const AdminDashboardContent = () => {
     }
   };
 
-  const loadContent = async () => {
+  const loadManagedAdminUsers = async (
+    sessionUser = adminUser,
+    { showError = false } = {}
+  ) => {
+    if (sessionUser?.role !== 'super_admin') {
+      setManagedAdminUsers([]);
+      setManagedAdminSections(nonSuperAdminSectionKeys);
+      return true;
+    }
+
+    try {
+      const response = await fetchAdminUsers();
+      setManagedAdminUsers(Array.isArray(response?.users) ? response.users : []);
+      setManagedAdminSections(
+        Array.isArray(response?.manageableSections) && response.manageableSections.length > 0
+          ? response.manageableSections
+          : nonSuperAdminSectionKeys
+      );
+      return true;
+    } catch (usersError) {
+      setManagedAdminUsers([]);
+      if (showError) {
+        setError(usersError?.message || 'Failed to load admin users.');
+        setSuccessMessage('');
+      }
+      return false;
+    }
+  };
+
+  const refreshManagedAdminUsers = async () => {
+    clearMessages();
+    const success = await loadManagedAdminUsers(adminUser, { showError: true });
+    if (success) {
+      setSuccessMessage('Admin users refreshed.');
+    }
+  };
+
+  const loadContent = async (sessionUser = adminUser) => {
     const data = await fetchAdminContent();
 
     const loadedSiteSettings = data?.siteSettings || {};
@@ -1064,6 +1180,7 @@ const AdminDashboardContent = () => {
     );
 
     await loadContactSubmissions();
+    await loadManagedAdminUsers(sessionUser);
   };
 
   useEffect(() => {
@@ -1077,7 +1194,7 @@ const AdminDashboardContent = () => {
         }
 
         setAdminUser(sessionData.user || null);
-        await loadContent();
+        await loadContent(sessionData.user || null);
       } catch (_error) {
         if (isMounted) {
           navigate('/admin/login', { replace: true });
@@ -2430,6 +2547,123 @@ const AdminDashboardContent = () => {
     setContactSubmissionSelectedItem(null);
   };
 
+  const toManagedAdminDraft = (user) => ({
+    username: String(user?.username || ''),
+    password: '',
+    full_name: String(user?.full_name || ''),
+    google_email: String(user?.google_email || ''),
+    role: user?.role === 'super_admin' ? 'super_admin' : 'admin',
+    allowed_sections: normalizeAllowedSectionsForUi(user?.allowed_sections),
+    is_active: user?.is_active ? 1 : 0,
+  });
+
+  const openManagedAdminCreate = () => {
+    setManagedAdminSelectedItem(null);
+    setManagedAdminDraft({
+      ...defaultManagedAdminUserDraft,
+      allowed_sections: managedAdminSections.includes('site-settings')
+        ? ['site-settings']
+        : (managedAdminSections[0] ? [managedAdminSections[0]] : []),
+    });
+    setManagedAdminModalOpen(true);
+  };
+
+  const openManagedAdminEdit = (user) => {
+    setManagedAdminSelectedItem(user);
+    setManagedAdminDraft(toManagedAdminDraft(user));
+    setManagedAdminModalOpen(true);
+  };
+
+  const closeManagedAdminModal = () => {
+    setManagedAdminModalOpen(false);
+    setManagedAdminSelectedItem(null);
+    setManagedAdminDraft(defaultManagedAdminUserDraft);
+  };
+
+  const toggleManagedAdminSection = (sectionKey) => {
+    setManagedAdminDraft((prev) => {
+      const existingSections = Array.isArray(prev.allowed_sections)
+        ? prev.allowed_sections
+        : [];
+
+      if (existingSections.includes(sectionKey)) {
+        return {
+          ...prev,
+          allowed_sections: existingSections.filter((item) => item !== sectionKey),
+        };
+      }
+
+      return {
+        ...prev,
+        allowed_sections: [...existingSections, sectionKey],
+      };
+    });
+  };
+
+  const saveManagedAdminUser = async () => {
+    const username = String(managedAdminDraft.username || '').trim();
+    const password = String(managedAdminDraft.password || '');
+    const fullName = toNullableString(managedAdminDraft.full_name);
+    const googleEmail = toNullableString(managedAdminDraft.google_email);
+    const role = managedAdminDraft.role === 'super_admin' ? 'super_admin' : 'admin';
+    const allowedSections = normalizeAllowedSectionsForUi(managedAdminDraft.allowed_sections);
+
+    if (!username) {
+      setError('Username is required.');
+      setSuccessMessage('');
+      return;
+    }
+
+    if (password && password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      setSuccessMessage('');
+      return;
+    }
+
+    if (!managedAdminSelectedItem && !googleEmail && !password) {
+      setError('Provide either Google email or password for new users.');
+      setSuccessMessage('');
+      return;
+    }
+
+    if (role === 'admin' && allowedSections.length === 0) {
+      setError('Select at least one section for Admin users.');
+      setSuccessMessage('');
+      return;
+    }
+
+    const payload = {
+      username,
+      full_name: fullName,
+      google_email: googleEmail,
+      role,
+      is_active: managedAdminDraft.is_active ? 1 : 0,
+      allowed_sections: role === 'admin' ? allowedSections : [],
+    };
+
+    if (password) {
+      payload.password = password;
+    }
+
+    let success;
+
+    if (managedAdminSelectedItem?.id) {
+      success = await runAction(
+        () => updateAdminUser(managedAdminSelectedItem.id, payload),
+        'Admin user updated successfully.'
+      );
+    } else {
+      success = await runAction(
+        () => createAdminUser(payload),
+        'Admin user created successfully.'
+      );
+    }
+
+    if (success) {
+      closeManagedAdminModal();
+    }
+  };
+
   // ============================================
   // EVENTS CONTENT HANDLERS
   // ============================================
@@ -2824,6 +3058,31 @@ const AdminDashboardContent = () => {
     }));
   };
 
+  const visibleSectionGroups = adminSectionGroups
+    .map((group) => ({
+      ...group,
+      sections: group.sections.filter((section) => canAccessSection(adminUser, section.key)),
+    }))
+    .filter((group) => group.sections.length > 0);
+
+  const visibleSectionKeys = visibleSectionGroups.flatMap((group) =>
+    group.sections.map((section) => section.key)
+  );
+  const effectiveActiveSection = visibleSectionKeys.includes(activeSection)
+    ? activeSection
+    : '';
+  const visibleSectionsFingerprint = visibleSectionKeys.join('|');
+
+  useEffect(() => {
+    if (visibleSectionKeys.length === 0) {
+      return;
+    }
+
+    if (!visibleSectionKeys.includes(activeSection)) {
+      setActiveSection(visibleSectionKeys[0]);
+    }
+  }, [activeSection, visibleSectionsFingerprint]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -2944,12 +3203,17 @@ const AdminDashboardContent = () => {
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold" style={{ backgroundColor: '#2563eb' }}>
                   {adminUser?.username?.charAt(0).toUpperCase() || 'A'}
                 </div>
-                <span 
-                  className="text-sm font-medium"
-                  style={{ color: isDark ? '#d1d5db' : '#374151' }}
-                >
-                  {adminUser?.username || 'Admin'}
-                </span>
+                <div className="flex flex-col">
+                  <span 
+                    className="text-sm font-medium leading-tight"
+                    style={{ color: isDark ? '#d1d5db' : '#374151' }}
+                  >
+                    {adminUser?.username || 'Admin'}
+                  </span>
+                  <span className="text-xs leading-tight" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                    {adminUser?.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                  </span>
+                </div>
               </div>
 
               {/* Logout button */}
@@ -3015,7 +3279,7 @@ const AdminDashboardContent = () => {
           </div>
 
           <nav className="p-3 space-y-4">
-            {adminSectionGroups.map((group) => (
+            {visibleSectionGroups.map((group) => (
               <div key={group.label}>
                 <div className="flex items-center gap-2 px-2 mb-2">
                   <span style={{ color: isDark ? '#6b7280' : '#9ca3af' }}>{group.icon}</span>
@@ -3028,7 +3292,7 @@ const AdminDashboardContent = () => {
                 </div>
                 <div className="space-y-0.5">
                   {group.sections.map((section) => {
-                    const isActive = activeSection === section.key;
+                    const isActive = effectiveActiveSection === section.key;
                     return (
                       <button
                         key={section.key}
@@ -3119,10 +3383,23 @@ const AdminDashboardContent = () => {
               </div>
             )}
 
+            {visibleSectionKeys.length === 0 && (
+              <AdminCard>
+                <div className="py-10 text-center space-y-2">
+                  <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                    No Sections Assigned
+                  </h2>
+                  <p className="text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                    This admin account does not currently have access to any dashboard section.
+                  </p>
+                </div>
+              </AdminCard>
+            )}
+
             {/* Mobile section selector */}
-            <div className="lg:hidden mb-6">
+            {visibleSectionKeys.length > 0 && <div className="lg:hidden mb-6">
               <select
-                value={activeSection}
+                value={effectiveActiveSection}
                 onChange={(e) => {
                   clearMessages();
                   setActiveSection(e.target.value);
@@ -3134,7 +3411,7 @@ const AdminDashboardContent = () => {
                   color: isDark ? '#ffffff' : '#111827'
                 }}
               >
-                {adminSectionGroups.map((group) => (
+                {visibleSectionGroups.map((group) => (
                   <optgroup key={group.label} label={group.label}>
                     {group.sections.map((section) => (
                       <option key={section.key} value={section.key}>
@@ -3144,10 +3421,10 @@ const AdminDashboardContent = () => {
                   </optgroup>
                 ))}
               </select>
-            </div>
+            </div>}
 
             {/* Site Settings Section */}
-            {activeSection === 'site-settings' && (
+            {effectiveActiveSection === 'site-settings' && (
               <AdminCard
                 title="Site Settings"
                 subtitle="View and manage site-wide configuration"
@@ -3458,7 +3735,7 @@ const AdminDashboardContent = () => {
             {/* ============================================ */}
             {/* HOME CONTENT SECTION */}
             {/* ============================================ */}
-            {activeSection === 'home-content' && (
+            {effectiveActiveSection === 'home-content' && (
               <>
                 <AdminCard
                   title="Home Content"
@@ -3634,7 +3911,7 @@ const AdminDashboardContent = () => {
             {/* ============================================ */}
             {/* NAVIGATION ITEMS SECTION */}
             {/* ============================================ */}
-            {activeSection === 'navigation' && (
+            {effectiveActiveSection === 'navigation' && (
               <>
                 <AdminCard
                   title="Navigation Items"
@@ -3767,7 +4044,7 @@ const AdminDashboardContent = () => {
             {/* ============================================ */}
             {/* SOCIAL LINKS SECTION */}
             {/* ============================================ */}
-            {activeSection === 'social' && (
+            {effectiveActiveSection === 'social' && (
               <>
                 <AdminCard
                   title="Social Links"
@@ -3863,7 +4140,7 @@ const AdminDashboardContent = () => {
             {/* ============================================ */}
             {/* FOOTER LINKS SECTION */}
             {/* ============================================ */}
-            {activeSection === 'footer' && (
+            {effectiveActiveSection === 'footer' && (
               <>
                 <AdminCard
                   title="Footer Links"
@@ -3970,7 +4247,7 @@ const AdminDashboardContent = () => {
             {/* ============================================ */}
             {/* HERO SLIDES SECTION */}
             {/* ============================================ */}
-            {activeSection === 'slides' && (
+            {effectiveActiveSection === 'slides' && (
               <>
                 <AdminCard
                   title="Hero Slides"
@@ -4088,7 +4365,7 @@ const AdminDashboardContent = () => {
             {/* ============================================ */}
             {/* HOME STATS SECTION */}
             {/* ============================================ */}
-            {activeSection === 'stats' && (
+            {effectiveActiveSection === 'stats' && (
               <>
                 <AdminCard
                   title="Home Stats"
@@ -4189,7 +4466,7 @@ const AdminDashboardContent = () => {
             {/* ============================================ */}
             {/* NEWS ITEMS SECTION */}
             {/* ============================================ */}
-            {activeSection === 'news' && (
+            {effectiveActiveSection === 'news' && (
               <>
                 <AdminCard
                   title="News Items"
@@ -4313,7 +4590,7 @@ const AdminDashboardContent = () => {
             )}
 
             {/* People Directory Section */}
-            {activeSection === 'people' && (
+            {effectiveActiveSection === 'people' && (
               <>
                 <AdminCard>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -4821,8 +5098,218 @@ const AdminDashboardContent = () => {
               </>
             )}
 
+            {/* Admin Access Section */}
+            {effectiveActiveSection === 'user-access' && adminUser?.role === 'super_admin' && (
+              <>
+                <AdminCard>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                      <h2 className="text-lg font-semibold" style={{ color: isDark ? '#ffffff' : '#111827' }}>
+                        Admin Access Management
+                      </h2>
+                      <p className="text-sm mt-1" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        Create admins and control which sidebar sections they can access.
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <AdminButton variant="secondary" onClick={refreshManagedAdminUsers} disabled={isWorking}>
+                        Refresh
+                      </AdminButton>
+                      <AdminButton onClick={openManagedAdminCreate} disabled={isWorking}>
+                        + Add User
+                      </AdminButton>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg" style={{ border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr style={{ backgroundColor: isDark ? '#1f2937' : '#f9fafb', borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Name</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Username</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Role</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Google Email</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Sections</th>
+                            <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody style={{ backgroundColor: isDark ? '#111827' : '#ffffff' }}>
+                          {managedAdminUsers.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-10 text-center text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                                No admin users found.
+                              </td>
+                            </tr>
+                          ) : (
+                            managedAdminUsers.map((user) => {
+                              const sectionCount = Array.isArray(user.allowed_sections)
+                                ? user.allowed_sections.length
+                                : 0;
+
+                              return (
+                                <tr
+                                  key={user.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  className="cursor-pointer transition-colors"
+                                  style={{ borderTop: `1px solid ${isDark ? '#1f2937' : '#f3f4f6'}` }}
+                                  onClick={() => openManagedAdminEdit(user)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      openManagedAdminEdit(user);
+                                    }
+                                  }}
+                                  onMouseEnter={(event) => {
+                                    event.currentTarget.style.backgroundColor = isDark ? '#1f2937' : '#f9fafb';
+                                  }}
+                                  onMouseLeave={(event) => {
+                                    event.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                >
+                                  <td className="py-3 px-4 text-sm font-medium" style={{ color: isDark ? '#ffffff' : '#111827' }}>{user.full_name || '-'}</td>
+                                  <td className="py-3 px-4 text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{user.username}</td>
+                                  <td className="py-3 px-4 text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>{user.role === 'super_admin' ? 'Super Admin' : 'Admin'}</td>
+                                  <td className="py-3 px-4 text-sm break-all" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{user.google_email || '-'}</td>
+                                  <td className="py-3 px-4 text-sm" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>{user.role === 'super_admin' ? 'All sections' : sectionCount}</td>
+                                  <td className="py-3 px-4 text-sm" style={{ color: user.is_active ? '#10b981' : (isDark ? '#9ca3af' : '#6b7280') }}>{user.is_active ? 'Active' : 'Inactive'}</td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </AdminCard>
+
+                <AdminModal
+                  isOpen={managedAdminModalOpen}
+                  onClose={closeManagedAdminModal}
+                  title={managedAdminSelectedItem ? 'Edit Admin User' : 'Create Admin User'}
+                  size="lg"
+                  footer={
+                    <div className="flex justify-end gap-3">
+                      <AdminButton variant="secondary" onClick={closeManagedAdminModal} disabled={isWorking}>Cancel</AdminButton>
+                      <AdminButton onClick={saveManagedAdminUser} disabled={isWorking}>Save</AdminButton>
+                    </div>
+                  }
+                >
+                  <div className="space-y-4">
+                    {managedAdminSelectedItem?.id === adminUser?.id && (
+                      <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: isDark ? 'rgba(30, 58, 138, 0.2)' : '#eff6ff', border: `1px solid ${isDark ? '#1d4ed8' : '#bfdbfe'}`, color: isDark ? '#bfdbfe' : '#1e3a8a' }}>
+                        Editing your own account. Role and active status changes are restricted.
+                      </div>
+                    )}
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <AdminInput
+                        label="Username"
+                        value={managedAdminDraft.username}
+                        onChange={(event) => setManagedAdminDraft((prev) => ({ ...prev, username: event.target.value }))}
+                        placeholder="username"
+                      />
+                      <AdminInput
+                        label={managedAdminSelectedItem ? 'New Password (optional)' : 'Password (optional with Google email)'}
+                        type="password"
+                        value={managedAdminDraft.password}
+                        onChange={(event) => setManagedAdminDraft((prev) => ({ ...prev, password: event.target.value }))}
+                        placeholder={managedAdminSelectedItem ? 'Leave empty to keep current password' : 'Set password if no Google email'}
+                      />
+                      <AdminInput
+                        label="Full Name"
+                        value={managedAdminDraft.full_name}
+                        onChange={(event) => setManagedAdminDraft((prev) => ({ ...prev, full_name: event.target.value }))}
+                        placeholder="Full name"
+                      />
+                      <AdminInput
+                        label="Google Email (optional)"
+                        type="email"
+                        value={managedAdminDraft.google_email}
+                        onChange={(event) => setManagedAdminDraft((prev) => ({ ...prev, google_email: event.target.value }))}
+                        placeholder="user@domain.com"
+                      />
+                    </div>
+
+                    {!managedAdminSelectedItem && (
+                      <p className="text-xs" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                        New user requires at least one login method: Google Email or Password.
+                      </p>
+                    )}
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>Role</label>
+                        <select
+                          value={managedAdminDraft.role}
+                          onChange={(event) => setManagedAdminDraft((prev) => ({
+                            ...prev,
+                            role: event.target.value,
+                            allowed_sections: event.target.value === 'admin'
+                              ? (prev.allowed_sections.length > 0
+                                ? prev.allowed_sections
+                                : (managedAdminSections[0] ? [managedAdminSections[0]] : []))
+                              : prev.allowed_sections,
+                          }))}
+                          disabled={managedAdminSelectedItem?.id === adminUser?.id}
+                          className="w-full px-3 py-2 rounded-lg text-sm border"
+                          style={{
+                            backgroundColor: isDark ? '#1f2937' : '#ffffff',
+                            borderColor: isDark ? '#4b5563' : '#d1d5db',
+                            color: isDark ? '#ffffff' : '#111827',
+                          }}
+                        >
+                          {managedAdminRoleOptions.map((roleOption) => (
+                            <option key={roleOption.value} value={roleOption.value}>{roleOption.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-7">
+                        <input
+                          type="checkbox"
+                          id="managed-admin-active"
+                          checked={Boolean(managedAdminDraft.is_active)}
+                          disabled={managedAdminSelectedItem?.id === adminUser?.id}
+                          onChange={(event) => setManagedAdminDraft((prev) => ({ ...prev, is_active: event.target.checked ? 1 : 0 }))}
+                          className="w-4 h-4 rounded"
+                        />
+                        <label htmlFor="managed-admin-active" className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>
+                          Active account
+                        </label>
+                      </div>
+                    </div>
+
+                    {managedAdminDraft.role === 'admin' && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>
+                          Allowed Dashboard Sections
+                        </p>
+                        <div className="grid sm:grid-cols-2 gap-2">
+                          {managedAdminSections.map((sectionKey) => (
+                            <label key={sectionKey} className="flex items-center gap-2 p-2 rounded-lg" style={{ border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`, backgroundColor: isDark ? '#1f2937' : '#f9fafb' }}>
+                              <input
+                                type="checkbox"
+                                checked={managedAdminDraft.allowed_sections.includes(sectionKey)}
+                                onChange={() => toggleManagedAdminSection(sectionKey)}
+                                className="w-4 h-4 rounded"
+                              />
+                              <span className="text-sm" style={{ color: isDark ? '#d1d5db' : '#374151' }}>
+                                {sectionDetails[sectionKey]?.title || sectionKey}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </AdminModal>
+              </>
+            )}
+
             {/* About Content Section */}
-            {activeSection === 'about-content' && (
+            {effectiveActiveSection === 'about-content' && (
               <>
                 <AdminCard>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -4967,7 +5454,7 @@ const AdminDashboardContent = () => {
             )}
 
             {/* Academics Content Section */}
-            {activeSection === 'academics-content' && (
+            {effectiveActiveSection === 'academics-content' && (
               <>
                 <AdminCard>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -5089,7 +5576,7 @@ const AdminDashboardContent = () => {
             )}
 
             {/* Contact Responses Section */}
-            {activeSection === 'contact-submissions' && (
+            {effectiveActiveSection === 'contact-submissions' && (
               <>
                 <AdminCard>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -5232,7 +5719,7 @@ const AdminDashboardContent = () => {
             )}
 
             {/* Contact Content Section */}
-            {activeSection === 'contact-content' && (
+            {effectiveActiveSection === 'contact-content' && (
               <>
                 <AdminCard>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -5369,7 +5856,7 @@ const AdminDashboardContent = () => {
             )}
 
             {/* Events Content Section */}
-            {activeSection === 'events-content' && (
+            {effectiveActiveSection === 'events-content' && (
               <>
                 <AdminCard>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -5470,7 +5957,7 @@ const AdminDashboardContent = () => {
             )}
 
             {/* Specializations Content Section */}
-            {activeSection === 'specializations-content' && (
+            {effectiveActiveSection === 'specializations-content' && (
               <>
                 <AdminCard>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">

@@ -48,14 +48,23 @@ API will run at `http://localhost:4000` by default.
 
 ## 3) Admin Authentication
 
-Authentication is session-based with username/password login.
+Authentication is session-based with username/password login and optional Google Sign-In.
 
 - `POST /api/admin/auth/login`
+- `POST /api/admin/auth/google`
 - `POST /api/admin/auth/logout`
 - `GET /api/admin/auth/session`
 
 On successful login, backend sets a secure HTTP-only cookie for admin access.
-The default admin user is auto-created at startup from `ADMIN_DEFAULT_USERNAME` and `ADMIN_DEFAULT_PASSWORD` in `.env`.
+If `admin_users` is empty, a bootstrap super admin is auto-created at startup with:
+
+- username: `admin` (fixed, stored in DB)
+- password: `ADMIN_BOOTSTRAP_PASSWORD` from `.env` (used only for first insert)
+
+Admin users support two roles:
+
+- `super_admin`: full access to all sections and user management.
+- `admin`: access only to explicitly assigned dashboard sections.
 
 ## 4) Admin API
 
@@ -73,6 +82,18 @@ All endpoints below require an authenticated admin session:
 - `POST/PATCH/DELETE /api/admin/news`
 - `GET /api/admin/people`
 - `POST/PATCH/DELETE /api/admin/people`
+- `GET /api/admin/contact-submissions`
+
+Super admin only:
+
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+- `PATCH /api/admin/users/:id`
+
+When creating users, provide at least one login method:
+
+- Google login via `google_email`, or
+- Password login via `password`.
 
 ## 5) Next Migration Targets
 

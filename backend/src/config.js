@@ -18,8 +18,11 @@ const config = {
     database: process.env.DB_NAME || "cewebsite",
   },
   admin: {
-    defaultUsername: process.env.ADMIN_DEFAULT_USERNAME || "admin",
-    defaultPassword: process.env.ADMIN_DEFAULT_PASSWORD || "admin123",
+    bootstrapPassword:
+      process.env.ADMIN_BOOTSTRAP_PASSWORD ||
+      process.env.ADMIN_DEFAULT_PASSWORD ||
+      "admin123",
+    googleClientId: process.env.ADMIN_GOOGLE_CLIENT_ID || "",
     sessionTtlDays: Number(process.env.ADMIN_SESSION_TTL_DAYS || 7),
     sessionCookieName: process.env.ADMIN_SESSION_COOKIE_NAME || "ce_admin_session",
   },

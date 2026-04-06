@@ -1,14 +1,21 @@
 const express = require("express");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
 const { z } = require("zod");
+const { OAuth2Client } = require("google-auth-library");
 const { config } = require("../config");
 const { query } = require("../db");
-const { requireAdminAuth } = require("../middleware/adminAuth");
+const { hashPassword } = require("../utils/security");
+const { requireAdminAuth, requireSuperAdmin } = require("../middleware/adminAuth");
 const {
+  ADMIN_ROLES,
+  ADMIN_SECTION_KEYS,
   SESSION_COOKIE_NAME,
+  normalizeAllowedSections,
   validateAdminCredentials,
+  getActiveAdminByGoogleEmail,
   createAdminSession,
   getAdminSessionByToken,
   revokeAdminSession,
@@ -80,10 +87,169 @@ const nonEmptyPatch = (shape) =>
       message: "At least one field is required",
     });
 
+const googleClient = config.admin.googleClientId
+  ? new OAuth2Client(config.admin.googleClientId)
+  : null;
+
+const manageableAdminSectionKeys = ADMIN_SECTION_KEYS.filter(
+  (sectionKey) => sectionKey !== "user-access"
+);
+const sectionPermissionSchema = z.enum(manageableAdminSectionKeys);
+
 const loginSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
 });
+
+const googleLoginSchema = z.object({
+  credential: z.string().min(1),
+});
+
+const adminUserCreateSchema = z.object({
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(80)
+    .regex(/^[a-zA-Z0-9._-]+$/),
+  password: z.string().min(8).optional(),
+  full_name: z.string().trim().max(190).nullable().optional(),
+  google_email: z.string().email().nullable().optional(),
+  role: z.enum([ADMIN_ROLES.SUPER_ADMIN, ADMIN_ROLES.ADMIN]),
+  allowed_sections: z.array(sectionPermissionSchema).optional(),
+  is_active: z.number().int().min(0).max(1).default(1),
+});
+
+const adminUserPatchSchema = nonEmptyPatch({
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(80)
+    .regex(/^[a-zA-Z0-9._-]+$/),
+  password: z.string().min(8),
+  full_name: z.string().trim().max(190).nullable(),
+  google_email: z.string().email().nullable(),
+  role: z.enum([ADMIN_ROLES.SUPER_ADMIN, ADMIN_ROLES.ADMIN]),
+  allowed_sections: z.array(sectionPermissionSchema),
+  is_active: z.number().int().min(0).max(1),
+});
+
+function normalizeOptionalString(value) {
+  const normalized = String(value || "").trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeOptionalEmail(value) {
+  const normalized = normalizeOptionalString(value);
+  return normalized ? normalized.toLowerCase() : null;
+}
+
+function normalizeAllowedSectionsForPayload(role, allowedSectionsInput) {
+  if (role !== ADMIN_ROLES.ADMIN) {
+    return null;
+  }
+
+  const normalizedSections = normalizeAllowedSections(allowedSectionsInput);
+  if (normalizedSections.length === 0) {
+    return null;
+  }
+
+  return JSON.stringify(normalizedSections);
+}
+
+function serializeAdminUser(row) {
+  const role = row.role === ADMIN_ROLES.SUPER_ADMIN
+    ? ADMIN_ROLES.SUPER_ADMIN
+    : ADMIN_ROLES.ADMIN;
+
+  return {
+    id: row.id,
+    username: row.username,
+    full_name: row.full_name || null,
+    google_email: row.google_email || null,
+    role,
+    is_active: row.is_active,
+    allowed_sections:
+      role === ADMIN_ROLES.SUPER_ADMIN
+        ? manageableAdminSectionKeys
+        : normalizeAllowedSections(row.allowed_sections),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+function getSectionAccessFromRoute(req) {
+  if (req.path === "/content" || req.path.startsWith("/auth/")) {
+    return null;
+  }
+
+  if (req.path === "/site-settings") {
+    return "site-settings";
+  }
+
+  if (req.path === "/home-content") {
+    return "home-content";
+  }
+
+  if (req.path === "/about-content") {
+    return "about-content";
+  }
+
+  if (req.path === "/academics-content") {
+    return "academics-content";
+  }
+
+  if (req.path === "/contact-content") {
+    return "contact-content";
+  }
+
+  if (req.path === "/events-content") {
+    return "events-content";
+  }
+
+  if (req.path === "/specializations-content") {
+    return "specializations-content";
+  }
+
+  if (req.path === "/contact-submissions") {
+    return "contact-submissions";
+  }
+
+  if (req.path.startsWith("/navigation-items")) {
+    return "navigation";
+  }
+
+  if (req.path.startsWith("/social-links")) {
+    return "social";
+  }
+
+  if (req.path.startsWith("/footer-links")) {
+    return "footer";
+  }
+
+  if (req.path.startsWith("/home/hero-slides")) {
+    return "slides";
+  }
+
+  if (req.path.startsWith("/home/stats")) {
+    return "stats";
+  }
+
+  if (req.path.startsWith("/news")) {
+    return "news";
+  }
+
+  if (req.path.startsWith("/people")) {
+    return "people";
+  }
+
+  if (req.path.startsWith("/users")) {
+    return "user-access";
+  }
+
+  return null;
+}
 
 const siteSettingsPatchSchema = nonEmptyPatch({
   site_name: z.string().min(1),
@@ -822,13 +988,80 @@ router.post("/auth/login", async (req, res) => {
 
     return res.json({
       ok: true,
-      user: adminUser,
+      user: {
+        id: adminUser.id,
+        username: adminUser.username,
+        fullName: adminUser.full_name,
+        googleEmail: adminUser.google_email,
+        role: adminUser.role,
+        allowedSections: adminUser.allowed_sections,
+      },
       expiresAt: session.expiresAt,
     });
   } catch (error) {
     return res.status(500).json({
       error: "Failed to login",
       message: error.message,
+    });
+  }
+});
+
+router.post("/auth/google", async (req, res) => {
+  const parsed = googleLoginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  if (!googleClient || !config.admin.googleClientId) {
+    return res.status(503).json({
+      error: "Google login unavailable",
+      message: "Google login is not configured on this server.",
+    });
+  }
+
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: parsed.data.credential,
+      audience: config.admin.googleClientId,
+    });
+
+    const payload = ticket.getPayload();
+    const email = payload?.email ? String(payload.email).toLowerCase() : "";
+
+    if (!email || payload?.email_verified !== true) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Google account email is not verified.",
+      });
+    }
+
+    const adminUser = await getActiveAdminByGoogleEmail(email);
+    if (!adminUser) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "This Google account is not linked to an admin user.",
+      });
+    }
+
+    const session = await createAdminSession(adminUser.id);
+    setAdminSessionCookie(res, session.token, session.expiresAt);
+
+    return res.json({
+      ok: true,
+      user: {
+        id: adminUser.id,
+        username: adminUser.username,
+        fullName: adminUser.full_name,
+        googleEmail: adminUser.google_email,
+        role: adminUser.role,
+        allowedSections: adminUser.allowed_sections,
+      },
+      expiresAt: session.expiresAt,
+    });
+  } catch (_error) {
+    return res.status(401).json({
+      error: "Unauthorized",
+      message: "Invalid Google login token.",
     });
   }
 });
@@ -877,6 +1110,10 @@ router.get("/auth/session", async (req, res) => {
       user: {
         id: session.user_id,
         username: session.username,
+        fullName: session.full_name,
+        googleEmail: session.google_email,
+        role: session.role,
+        allowedSections: session.allowed_sections,
       },
       expiresAt: session.expires_at,
     });
@@ -889,6 +1126,313 @@ router.get("/auth/session", async (req, res) => {
 });
 
 router.use(requireAdminAuth);
+
+router.use((req, res, next) => {
+  const sectionKey = getSectionAccessFromRoute(req);
+  if (!sectionKey) {
+    return next();
+  }
+
+  if (req.adminUser?.role === ADMIN_ROLES.SUPER_ADMIN) {
+    return next();
+  }
+
+  const allowedSections = Array.isArray(req.adminUser?.allowedSections)
+    ? req.adminUser.allowedSections
+    : [];
+
+  if (sectionKey !== "user-access" && allowedSections.includes(sectionKey)) {
+    return next();
+  }
+
+  return res.status(403).json({
+    error: "Forbidden",
+    message: "You do not have access to this section.",
+  });
+});
+
+router.get("/users", requireSuperAdmin, async (_req, res) => {
+  try {
+    const users = await query(
+      `SELECT
+        id,
+        username,
+        full_name,
+        google_email,
+        role,
+        allowed_sections,
+        is_active,
+        created_at,
+        updated_at
+      FROM admin_users
+      ORDER BY created_at ASC, id ASC`
+    );
+
+    return res.json({
+      users: users.map(serializeAdminUser),
+      manageableSections: manageableAdminSectionKeys,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch admin users",
+      message: error.message,
+    });
+  }
+});
+
+router.post("/users", requireSuperAdmin, async (req, res) => {
+  const parsed = adminUserCreateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  const payload = parsed.data;
+  const role = payload.role;
+  const normalizedGoogleEmail = normalizeOptionalEmail(payload.google_email);
+  const normalizedPassword = normalizeOptionalString(payload.password);
+  const normalizedSections = normalizeAllowedSections(payload.allowed_sections);
+
+  if (!normalizedGoogleEmail && !normalizedPassword) {
+    return res.status(400).json({
+      error: "Validation failed",
+      message: "Provide either Google email or password for new users.",
+    });
+  }
+
+  if (role === ADMIN_ROLES.ADMIN && normalizedSections.length === 0) {
+    return res.status(400).json({
+      error: "Validation failed",
+      message: "Admin users must have at least one allowed section.",
+    });
+  }
+
+  const password = hashPassword(
+    normalizedPassword || crypto.randomBytes(32).toString("hex")
+  );
+
+  try {
+    const insertResult = await query(
+      `INSERT INTO admin_users (
+        username,
+        full_name,
+        google_email,
+        password_hash,
+        password_salt,
+        role,
+        allowed_sections,
+        is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        payload.username.trim(),
+        normalizeOptionalString(payload.full_name),
+        normalizedGoogleEmail,
+        password.hash,
+        password.salt,
+        role,
+        normalizeAllowedSectionsForPayload(role, payload.allowed_sections),
+        payload.is_active,
+      ]
+    );
+
+    const [createdUser] = await query(
+      `SELECT
+        id,
+        username,
+        full_name,
+        google_email,
+        role,
+        allowed_sections,
+        is_active,
+        created_at,
+        updated_at
+      FROM admin_users
+      WHERE id = ?
+      LIMIT 1`,
+      [insertResult.insertId]
+    );
+
+    return res.status(201).json({
+      ok: true,
+      user: serializeAdminUser(createdUser),
+    });
+  } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        error: "Duplicate admin user",
+        message: "Username or Google email already exists.",
+      });
+    }
+
+    return res.status(500).json({
+      error: "Failed to create admin user",
+      message: error.message,
+    });
+  }
+});
+
+router.patch("/users/:id", requireSuperAdmin, async (req, res) => {
+  const id = getIdFromParams(req, res);
+  if (!id) {
+    return;
+  }
+
+  const parsed = adminUserPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  try {
+    const [existingUser] = await query(
+      `SELECT
+        id,
+        username,
+        full_name,
+        google_email,
+        role,
+        allowed_sections,
+        is_active
+      FROM admin_users
+      WHERE id = ?
+      LIMIT 1`,
+      [id]
+    );
+
+    if (!existingUser) {
+      return res.status(404).json({
+        error: "Not found",
+        message: "Admin user not found.",
+      });
+    }
+
+    const payload = { ...parsed.data };
+    const nextRole = payload.role || existingUser.role;
+
+    if (req.adminUser.id === id) {
+      if (payload.role && payload.role !== existingUser.role) {
+        return res.status(400).json({
+          error: "Invalid action",
+          message: "You cannot change your own role.",
+        });
+      }
+
+      if (
+        Object.prototype.hasOwnProperty.call(payload, "is_active") &&
+        payload.is_active !== existingUser.is_active
+      ) {
+        return res.status(400).json({
+          error: "Invalid action",
+          message: "You cannot change your own active status.",
+        });
+      }
+    }
+
+    const nextAllowedSections =
+      payload.allowed_sections !== undefined
+        ? normalizeAllowedSections(payload.allowed_sections)
+        : normalizeAllowedSections(existingUser.allowed_sections);
+
+    if (nextRole === ADMIN_ROLES.ADMIN && nextAllowedSections.length === 0) {
+      return res.status(400).json({
+        error: "Validation failed",
+        message: "Admin users must have at least one allowed section.",
+      });
+    }
+
+    const updates = {};
+
+    if (payload.username !== undefined) {
+      updates.username = payload.username.trim();
+    }
+
+    if (payload.full_name !== undefined) {
+      updates.full_name = normalizeOptionalString(payload.full_name);
+    }
+
+    if (payload.google_email !== undefined) {
+      updates.google_email = normalizeOptionalEmail(payload.google_email);
+    }
+
+    if (payload.role !== undefined) {
+      updates.role = payload.role;
+    }
+
+    if (payload.is_active !== undefined) {
+      updates.is_active = payload.is_active;
+    }
+
+    if (
+      payload.allowed_sections !== undefined ||
+      payload.role !== undefined
+    ) {
+      updates.allowed_sections = normalizeAllowedSectionsForPayload(
+        nextRole,
+        nextAllowedSections
+      );
+    }
+
+    if (payload.password !== undefined) {
+      const password = hashPassword(payload.password);
+      updates.password_hash = password.hash;
+      updates.password_salt = password.salt;
+    }
+
+    const updateClause = buildUpdateClause(updates, [
+      "username",
+      "full_name",
+      "google_email",
+      "role",
+      "allowed_sections",
+      "is_active",
+      "password_hash",
+      "password_salt",
+    ]);
+
+    if (!updateClause) {
+      return res.status(400).json({
+        error: "No valid fields to update",
+      });
+    }
+
+    await query(
+      `UPDATE admin_users SET ${updateClause.setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [...updateClause.values, id]
+    );
+
+    const [updatedUser] = await query(
+      `SELECT
+        id,
+        username,
+        full_name,
+        google_email,
+        role,
+        allowed_sections,
+        is_active,
+        created_at,
+        updated_at
+      FROM admin_users
+      WHERE id = ?
+      LIMIT 1`,
+      [id]
+    );
+
+    return res.json({
+      ok: true,
+      user: serializeAdminUser(updatedUser),
+    });
+  } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({
+        error: "Duplicate admin user",
+        message: "Username or Google email already exists.",
+      });
+    }
+
+    return res.status(500).json({
+      error: "Failed to update admin user",
+      message: error.message,
+    });
+  }
+});
 
 router.get("/content", async (_req, res) => {
   try {

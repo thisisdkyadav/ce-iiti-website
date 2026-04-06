@@ -227,6 +227,13 @@ export function adminLogin(username, password) {
   });
 }
 
+export function adminGoogleLogin(credential) {
+  return adminRequest("/api/admin/auth/google", {
+    method: "POST",
+    body: { credential },
+  });
+}
+
 export function adminLogout() {
   return adminRequest("/api/admin/auth/logout", {
     method: "POST",
@@ -239,6 +246,24 @@ export function fetchAdminSession() {
 
 export function fetchAdminContent() {
   return adminRequest("/api/admin/content");
+}
+
+export function fetchAdminUsers() {
+  return adminRequest("/api/admin/users");
+}
+
+export function createAdminUser(payload) {
+  return adminRequest("/api/admin/users", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function updateAdminUser(id, payload) {
+  return adminRequest(`/api/admin/users/${id}`, {
+    method: "PATCH",
+    body: payload,
+  });
 }
 
 export function uploadAdminImage(file, category = "general") {

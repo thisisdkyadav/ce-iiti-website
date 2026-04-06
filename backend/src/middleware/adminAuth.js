@@ -1,7 +1,9 @@
 const {
+  ADMIN_ROLES,
   SESSION_COOKIE_NAME,
   getAdminSessionByToken,
   clearAdminSessionCookie,
+  hasAdminSectionAccess,
 } = require("../services/adminAuth");
 
 async function requireAdminAuth(req, res, next) {
@@ -33,6 +35,12 @@ async function requireAdminAuth(req, res, next) {
     req.adminUser = {
       id: session.user_id,
       username: session.username,
+      fullName: session.full_name || null,
+      googleEmail: session.google_email || null,
+      role: session.role || ADMIN_ROLES.ADMIN,
+      allowedSections: Array.isArray(session.allowed_sections)
+        ? session.allowed_sections
+        : [],
     };
 
     req.adminSession = {
@@ -50,6 +58,32 @@ async function requireAdminAuth(req, res, next) {
   }
 }
 
+function requireSuperAdmin(req, res, next) {
+  if (req.adminUser?.role !== ADMIN_ROLES.SUPER_ADMIN) {
+    return res.status(403).json({
+      error: "Forbidden",
+      message: "Super admin access is required.",
+    });
+  }
+
+  return next();
+}
+
+function requireAdminSection(sectionKey) {
+  return function sectionGuard(req, res, next) {
+    if (hasAdminSectionAccess(req.adminUser, sectionKey)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      error: "Forbidden",
+      message: "You do not have access to this section.",
+    });
+  };
+}
+
 module.exports = {
   requireAdminAuth,
+  requireSuperAdmin,
+  requireAdminSection,
 };

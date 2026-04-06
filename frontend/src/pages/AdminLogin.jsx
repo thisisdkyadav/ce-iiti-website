@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminLogin, fetchAdminSession } from '../lib/contentApi';
+import { adminGoogleLogin, adminLogin, fetchAdminSession } from '../lib/contentApi';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import './admin.css';
 
@@ -13,6 +13,10 @@ const LoginForm = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const googleButtonRef = useRef(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
   const isDark = theme === 'dark';
 
@@ -40,6 +44,89 @@ const LoginForm = () => {
       isMounted = false;
     };
   }, [navigate]);
+
+  useEffect(() => {
+    if (!googleClientId || isCheckingSession) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    const renderGoogleButton = () => {
+      if (!isMounted || !googleButtonRef.current || !window.google?.accounts?.id) {
+        return;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: async (response) => {
+          if (!isMounted || !response?.credential) {
+            return;
+          }
+
+          setError('');
+          setIsGoogleLoading(true);
+
+          try {
+            await adminGoogleLogin(response.credential);
+            navigate('/admin', { replace: true });
+          } catch (googleError) {
+            if (isMounted) {
+              setError(googleError.message || 'Google sign-in failed.');
+            }
+          } finally {
+            if (isMounted) {
+              setIsGoogleLoading(false);
+            }
+          }
+        },
+      });
+
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: isDark ? 'filled_black' : 'outline',
+        size: 'large',
+        shape: 'pill',
+        width: 320,
+        text: 'continue_with',
+      });
+      setGoogleReady(true);
+    };
+
+    if (window.google?.accounts?.id) {
+      renderGoogleButton();
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const existingScript = document.querySelector('script[data-google-signin-script="true"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', renderGoogleButton);
+      return () => {
+        isMounted = false;
+        existingScript.removeEventListener('load', renderGoogleButton);
+      };
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleSigninScript = 'true';
+    script.addEventListener('load', renderGoogleButton);
+    script.addEventListener('error', () => {
+      if (isMounted) {
+        setError('Failed to load Google sign-in.');
+      }
+    });
+    document.head.appendChild(script);
+
+    return () => {
+      isMounted = false;
+      script.removeEventListener('load', renderGoogleButton);
+    };
+  }, [googleClientId, isCheckingSession, isDark, navigate]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -288,6 +375,49 @@ const LoginForm = () => {
                 </>
               )}
             </button>
+
+            {googleClientId && (
+              <>
+                <div className="relative py-1">
+                  <div
+                    className="absolute inset-0 flex items-center"
+                    aria-hidden="true"
+                  >
+                    <div
+                      className="w-full"
+                      style={{ borderTop: `1px solid ${isDark ? '#374151' : '#e5e7eb'}` }}
+                    />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span
+                      className="px-3 text-xs uppercase tracking-wider"
+                      style={{
+                        backgroundColor: isDark ? '#1f2937' : '#ffffff',
+                        color: isDark ? '#9ca3af' : '#6b7280',
+                      }}
+                    >
+                      OR
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-center">
+                    <div ref={googleButtonRef} className="w-full flex justify-center" />
+                  </div>
+                  {!googleReady && (
+                    <p className="text-xs text-center" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                      Loading Google sign-in...
+                    </p>
+                  )}
+                  {isGoogleLoading && (
+                    <p className="text-xs text-center" style={{ color: isDark ? '#9ca3af' : '#6b7280' }}>
+                      Verifying Google account...
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </form>
 
           {/* Footer */}
