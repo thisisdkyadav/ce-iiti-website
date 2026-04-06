@@ -223,7 +223,10 @@ const LoginForm = () => {
         >
           {/* Logo & Title */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg mb-4">
+            <div
+              className="inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-lg mb-4"
+              style={{ backgroundColor: '#2563eb' }}
+            >
               <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
               </svg>
@@ -351,11 +354,12 @@ const LoginForm = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3.5 text-white font-semibold rounded-xl shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               style={{
-                boxShadow: isDark 
-                  ? '0 4px 14px rgba(59, 130, 246, 0.15)' 
-                  : '0 4px 14px rgba(59, 130, 246, 0.25)'
+                backgroundColor: isDark ? '#374151' : '#111827',
+                boxShadow: isDark
+                  ? '0 4px 14px rgba(17, 24, 39, 0.25)'
+                  : '0 4px 14px rgba(17, 24, 39, 0.18)'
               }}
             >
               {isLoading ? (
