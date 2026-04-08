@@ -581,7 +581,7 @@ const newsCreateSchema = z.object({
   excerpt: z.string().min(1),
   category: z.string().default("News"),
   image_url: z.string().optional(),
-  external_link: z.string().optional(),
+  external_link: z.string().nullable().optional(),
   publish_date: z.string().datetime(),
   is_active: z.number().int().min(0).max(1).default(1),
 });
@@ -591,7 +591,7 @@ const newsPatchSchema = nonEmptyPatch({
   excerpt: z.string().min(1),
   category: z.string(),
   image_url: z.string(),
-  external_link: z.string(),
+  external_link: z.string().nullable(),
   publish_date: z.string().datetime(),
   is_active: z.number().int().min(0).max(1),
 });
